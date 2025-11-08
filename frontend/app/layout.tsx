@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import Script from "next/script"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"] })
@@ -19,6 +20,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Knot SDK - Official CDN */}
+        <Script
+          src="https://unpkg.com/knotapi-js@next"
+          strategy="beforeInteractive"
+        />
+      </head>
       <body className={`${geist.className} antialiased`}>
         {children}
         <Analytics />

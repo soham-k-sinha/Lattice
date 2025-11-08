@@ -2,29 +2,46 @@
 
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Plus, MessageSquare, Users, X, Search } from "lucide-react"
+import { Plus, MessageSquare, Users, X, Search, CreditCard } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { CreateGroupDialog } from "@/components/create-group-dialog"
+import { api, type Chat } from "@/lib/api"
 
 interface ChatSidebarProps {
   onClose: () => void
   currentChatId?: string
 }
 
-const chats = [
-  { id: "main", name: "Personal Finance", type: "solo", active: false },
-  { id: "group1", name: "Weekend Trip", type: "group", members: 3, active: false },
-  { id: "group2", name: "Dinner Plans", type: "group", members: 4, active: false },
-  { id: "demo", name: "Demo Chat", type: "solo", active: false },
-]
-
 export function ChatSidebar({ onClose, currentChatId }: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
+  const [chats, setChats] = useState<Chat[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredChats = chats.filter((chat) => chat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Load chats from backend
+  useEffect(() => {
+    loadChats()
+  }, [])
+
+  const loadChats = async () => {
+    try {
+      setLoading(true)
+      const data = await api.getChats()
+      setChats(data)
+    } catch (error) {
+      console.error("Failed to load chats:", error)
+      // Note: fetchWithAuth will automatically redirect to /login on 401
+      // So we just need to fail silently here
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredChats = chats.filter((chat) => 
+    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
     <>
@@ -67,43 +84,47 @@ export function ChatSidebar({ onClose, currentChatId }: ChatSidebarProps) {
 
         {/* Chat list */}
         <div className="flex-1 overflow-y-auto px-2">
-          <div className="space-y-1">
-            {filteredChats.map((chat) => {
-              const isActive = currentChatId === chat.id
-              return (
-                <Link key={chat.id} href={`/chat/${chat.id}`}>
-                  <motion.button
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                      isActive ? "bg-accent/10 text-accent-foreground" : "hover:bg-muted text-muted-foreground"
-                    }`}
-                    whileHover={{ x: 4 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`shrink-0 ${isActive ? "text-accent" : ""}`}>
-                        {chat.type === "solo" ? (
-                          <MessageSquare className="w-4 h-4" />
-                        ) : (
-                          <div className="relative">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent"></div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredChats.map((chat) => {
+                const isActive = currentChatId === chat.id.toString()
+                return (
+                  <Link key={chat.id} href={`/chat/${chat.id}`}>
+                    <motion.button
+                      className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                        isActive ? "bg-accent/10 text-accent-foreground" : "hover:bg-muted text-muted-foreground"
+                      }`}
+                      whileHover={{ x: 4 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`shrink-0 ${isActive ? "text-accent" : ""}`}>
+                          {chat.type === "solo" ? (
+                            <MessageSquare className="w-4 h-4" />
+                          ) : (
                             <Users className="w-4 h-4" />
-                            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-accent text-accent-foreground text-[8px] flex items-center justify-center font-medium">
-                              {chat.members}
-                            </span>
-                          </div>
-                        )}
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{chat.title}</p>
+                          {chat.last_message && (
+                            <p className="text-xs text-muted-foreground truncate">{chat.last_message}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{chat.name}</p>
-                        {chat.type === "group" && (
-                          <p className="text-xs text-muted-foreground">{chat.members} members</p>
-                        )}
-                      </div>
-                    </div>
-                  </motion.button>
-                </Link>
-              )
-            })}
-          </div>
+                    </motion.button>
+                  </Link>
+                )
+              })}
+              {filteredChats.length === 0 && !loading && (
+                <p className="text-center text-muted-foreground text-sm py-8">No chats found</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -117,9 +138,11 @@ export function ChatSidebar({ onClose, currentChatId }: ChatSidebarProps) {
         </div>
       </motion.aside>
 
-      <CreateGroupDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
+      <CreateGroupDialog 
+        open={createGroupOpen} 
+        onOpenChange={setCreateGroupOpen}
+        onGroupCreated={loadChats}
+      />
     </>
   )
 }
-
-import { CreditCard } from "lucide-react"

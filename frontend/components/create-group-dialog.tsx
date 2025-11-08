@@ -7,18 +7,21 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { X, Mail, Check, Sparkles } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { api } from "@/lib/api"
 
 interface CreateGroupDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onGroupCreated?: () => void
 }
 
-export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps) {
+export function CreateGroupDialog({ open, onOpenChange, onGroupCreated }: CreateGroupDialogProps) {
   const router = useRouter()
   const [groupName, setGroupName] = useState("")
   const [emailInput, setEmailInput] = useState("")
   const [members, setMembers] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
+  const [error, setError] = useState("")
 
   const validateEmail = (email: string) => {
     return email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
@@ -39,19 +42,31 @@ export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps
     if (!groupName || members.length === 0) return
 
     setIsCreating(true)
+    setError("")
 
-    // Simulate creation
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      // Call backend API to create group
+      const newGroup = await api.createGroup(groupName, members)
+      
+      // Close dialog
+      onOpenChange(false)
 
-    // Navigate to new group chat
-    const groupId = `group-${Date.now()}`
-    router.push(`/chat/${groupId}`)
-    onOpenChange(false)
-
-    // Reset form
-    setGroupName("")
-    setMembers([])
-    setIsCreating(false)
+      // Reset form
+      setGroupName("")
+      setMembers([])
+      
+      // Notify parent to reload chats list (to show new group in sidebar)
+      if (onGroupCreated) {
+        onGroupCreated()
+      }
+      
+      // Navigate to the new group chat
+      router.push(`/chat/${newGroup.id}`)
+    } catch (err: any) {
+      setError(err.message || "Failed to create group")
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   return (
@@ -62,6 +77,13 @@ export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Error message */}
+          {error && (
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+              {error}
+            </div>
+          )}
+          
           {/* Group name */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-muted-foreground">Group Name</label>

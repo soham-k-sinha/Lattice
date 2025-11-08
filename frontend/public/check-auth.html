@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Status Check</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        .status {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success { background: #1a4d2e; border: 1px solid #2d7a4f; }
+        .error { background: #4d1a1a; border: 1px solid #7a2d2d; }
+        .token { 
+            background: #1a1a1a; 
+            padding: 10px; 
+            border-radius: 4px; 
+            font-family: monospace;
+            word-break: break-all;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1d4ed8; }
+        .danger { background: #dc2626; }
+        .danger:hover { background: #b91c1c; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Lattice Auth Status</h1>
+    
+    <div id="status"></div>
+    
+    <div>
+        <button onclick="location.href='/login'">Go to Login</button>
+        <button onclick="location.href='/signup'">Go to Signup</button>
+        <button class="danger" onclick="clearToken()">Clear Token</button>
+        <button onclick="checkAuth()">Refresh</button>
+    </div>
+
+    <script>
+        function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            const statusDiv = document.getElementById('status');
+            
+            if (!token) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <h2>❌ Not Authenticated</h2>
+                    <p>No access token found in localStorage.</p>
+                    <p><strong>Solution:</strong> Click "Go to Login" above and sign in with:</p>
+                    <ul>
+                        <li>Email: <code>alice@demo.com</code></li>
+                        <li>Password: <code>password123</code></li>
+                    </ul>
+                `;
+                return;
+            }
+            
+            // Parse token to get info
+            try {
+                const parts = token.split('.');
+                const payload = JSON.parse(atob(parts[1]));
+                const expiresAt = new Date(payload.exp * 1000);
+                const isExpired = Date.now() > payload.exp * 1000;
+                
+                if (isExpired) {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = `
+                        <h2>⚠️ Token Expired</h2>
+                        <p>Your token expired at: ${expiresAt.toLocaleString()}</p>
+                        <p><strong>Solution:</strong> Click "Clear Token" then log in again.</p>
+                    `;
+                    return;
+                }
+                
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = `
+                    <h2>✅ Authenticated!</h2>
+                    <p><strong>User:</strong> ${payload.name} (${payload.email})</p>
+                    <p><strong>User ID:</strong> ${payload.user_id}</p>
+                    <p><strong>Expires:</strong> ${expiresAt.toLocaleString()}</p>
+                    <p><strong>Time left:</strong> ${Math.round((payload.exp * 1000 - Date.now()) / 1000 / 60)} minutes</p>
+                    <div class="token">
+                        <strong>Token:</strong><br>
+                        ${token.substring(0, 80)}...
+                    </div>
+                    <p>✅ You can now access protected pages like <a href="/chat/1">/chat/1</a></p>
+                `;
+            } catch (e) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <h2>❌ Invalid Token</h2>
+                    <p>Token exists but is malformed.</p>
+                    <p><strong>Solution:</strong> Click "Clear Token" then log in again.</p>
+                `;
+            }
+        }
+        
+        function clearToken() {
+            localStorage.removeItem('access_token');
+            alert('Token cleared! Refresh the page to see the change.');
+            checkAuth();
+        }
+        
+        // Check on load
+        checkAuth();
+    </script>
+</body>
+</html>
+

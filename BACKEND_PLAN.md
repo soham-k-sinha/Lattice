@@ -24,19 +24,24 @@ This document summarizes every backend capability implied by the current Next.js
 
 All of these modules can live in one backend app for the MVP, but the seams define where we call external APIs.
 
-## 3. When Each External API Is Called
+## 3. Exact External Endpoints We’ll Use
 
-| Scenario | Trigger | External Calls | Notes |
+| Scenario | Trigger | External Endpoint(s) | Notes |
 | --- | --- | --- | --- |
-| Onboarding “Connect with Knot” | User taps Connect button | `POST /knot/link-token`, `POST /knot/token-exchange` | Only once per user unless they unlink accounts. |
-| Viewing Linked Accounts | `/accounts` route loads | `GET /knot/accounts` (scoped) | Cached for 15 min; no need to hit Knot on every click. |
-| Chat about specific purchases (solo) | User mentions “Amazon cart”, “DoorDash order”, “UberEats receipt”, etc. | `GET /knot/transactions?merchant=Amazon|DoorDash|UberEats` | Knot is only called for merchants it supports (these whitelisted commerce providers). Generic banking questions bypass Knot. |
-| Group expense split | Chat intent “split” inside group | `GET /knot/transactions` (merchant filter) + Dedalus Smart Split agent | Only call Knot if we need actual transaction amounts; otherwise rely on user-provided numbers. |
-| Card optimizer | Chat intent “card recommendation” | Dedalus Card Agent → Groq/Gemini fallback + optional `GET /knot/cards` for rewards data | Knot returns available cards + categories; AI chooses best. |
-| Price tracker | Chat intent “price tracking / best time to buy” | Dedalus Price Agent + optionally X API for trend signals | No Knot call; data comes from agents + social context. |
-| Insights dashboard | `/insights` route loads or refresh job runs | `POST /snowflake/sql` for aggregates; optionally X API for trend labels | Run server-side cron to cache results; UI hits cached data. |
-| Social/trend lookup | User explicitly asks “What’s trending on X for flights?” | `GET /x/search` | Do **not** call X unless prompt contains relevant keywords; keep optional. |
-| Settings, Groups, basic chat | Standard CRUD | No external calls (pure Postgres) | These flows stay internal. |
+| Knot onboarding session | User taps “Connect with Knot” | `POST /session/create` (type=`link` or `transaction_link`) | Basic auth using `client_id:secret`; include `external_user_id`, contact info. |
+| Extend SDK session | SDK needs more time | `POST /session/extend` | Pass `session_id` returned earlier. |
+| Fetch Knot public key for JWE | Server startup / rotation | `GET /jwe/key` | Used to encrypt `user` + `card` payloads for switch/checkout. Cache per `kid`. |
+| List supported merchants | Prefetch for onboarding & card suggestions | `POST /merchant/list` (type=`card_switcher` or `transaction_link`) | Filter by platform if needed; cache daily. |
+| Get linked merchant accounts | `/accounts` route or chat context | `GET /accounts/get?external_user_id=…` | Optional `merchant_id` filter; cached 15 min. |
+| Detect new accounts | Background enrichment | `GET /detected_accounts/get?external_user_id=…` | Helps suggest merchants to link; no UI call every render. |
+| Delete user data | User requests unlink/delete | `POST /user/delete` | Clean-up before removing user locally. |
+| Transaction sync for specific merchant (Amazon, DoorDash, UberEats, Lyft/Uber, Airbnb, Instacart, etc.) | Chat references merchant or group split needs real data | `POST /transactions/sync` with `merchant_id`, `external_user_id`, optional `cursor`, `limit` | Cursor-based; store `next_cursor` per merchant-user pair. |
+| Fetch specific transaction details | User clicks “show receipt” | `GET /transactions/{id}` | Only when user drills into a transaction; not default. |
+| Card switch (if we actually change card on merchant) | AI suggests “switch default card” and user approves | `POST /card` with `task_id` + `jwe` | Build JWE using Knot public key; requires webhook `task_id`. |
+| Shopping cart actions (future) | Auto-add items / checkout for users | `POST /cart`, `POST /cart/checkout` | Only if hackathon scope includes merchant-side ordering. |
+| Snowflake analytics | Insights refresh cron | `POST /snowflake/sql` (custom) | Runs queries for spend, rewards, trends; results cached. |
+| Social trends | User asks for X trends | `GET /x/search` (custom) | Hit only when keywords present; respect rate limits. |
+| AI inference | Every chat message after intent detection | Dedalus MCP endpoints (internal), Groq API, Gemini API | Choose provider based on action; responses normalized. |
 
 ## 4. MCP / AI Agent Architecture
 

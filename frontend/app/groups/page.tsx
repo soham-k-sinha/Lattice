@@ -3,34 +3,71 @@
 import { motion } from "framer-motion"
 import { AppNavigation } from "@/components/app-navigation"
 import { Button } from "@/components/ui/button"
-import { Users, Plus, DollarSign, MapPin } from "lucide-react"
+import { Users, Plus, DollarSign, Calendar } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { CreateGroupDialog } from "@/components/create-group-dialog"
+import { api, type Group } from "@/lib/api"
 
-const activeGroups = [
-  {
-    id: "group1",
-    name: "Weekend Trip",
-    members: 3,
-    lastActivity: "2 hours ago",
-    context: "Planning an Airbnb booking",
-    totalSpend: 450,
-    color: "from-teal-500/20 to-cyan-500/20",
-  },
-  {
-    id: "group2",
-    name: "Dinner Plans",
-    members: 4,
-    lastActivity: "5 hours ago",
-    context: "Restaurant reservations",
-    totalSpend: 180,
-    color: "from-violet-500/20 to-purple-500/20",
-  },
+const groupColors = [
+  "from-teal-500/20 to-cyan-500/20",
+  "from-violet-500/20 to-purple-500/20",
+  "from-pink-500/20 to-rose-500/20",
+  "from-amber-500/20 to-orange-500/20",
 ]
 
 export default function GroupsPage() {
+  const router = useRouter()
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
+  const [groups, setGroups] = useState<Group[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadGroups()
+  }, [])
+
+  const loadGroups = async () => {
+    try {
+      setLoading(true)
+      const data = await api.getGroups()
+      setGroups(data)
+    } catch (error) {
+      console.error("Failed to load groups:", error)
+      if (error instanceof Error && error.message.includes("401")) {
+        router.push("/login")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatLastActivity = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    
+    if (diffMins < 60) return `${diffMins}m ago`
+    const diffHours = Math.floor(diffMins / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.floor(diffHours / 24)
+    return `${diffDays}d ago`
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-background">
+        <AppNavigation />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading groups...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -52,7 +89,7 @@ export default function GroupsPage() {
 
           {/* Active groups */}
           <div className="space-y-4">
-            {activeGroups.map((group, index) => (
+            {groups.map((group, index) => (
               <motion.div
                 key={group.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -66,7 +103,7 @@ export default function GroupsPage() {
                     transition={{ duration: 0.2 }}
                   >
                     {/* Gradient background */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${group.color} opacity-50`} />
+                    <div className={`absolute inset-0 bg-gradient-to-br ${groupColors[index % groupColors.length]} opacity-50`} />
 
                     <div className="relative">
                       <div className="flex items-start justify-between mb-4">
@@ -77,7 +114,7 @@ export default function GroupsPage() {
                           <div>
                             <h3 className="font-semibold text-lg">{group.name}</h3>
                             <p className="text-sm text-muted-foreground">
-                              {group.members} members · {group.lastActivity}
+                              {group.members.length} members · {formatLastActivity(group.last_activity)}
                             </p>
                           </div>
                         </div>
@@ -85,12 +122,12 @@ export default function GroupsPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex items-center gap-2 text-sm">
-                          <MapPin className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{group.context}</span>
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground truncate">{group.context}</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-medium">${group.totalSpend} total</span>
+                          <span className="font-medium">${group.total_spend.toFixed(2)} total</span>
                         </div>
                       </div>
                     </div>
@@ -101,7 +138,7 @@ export default function GroupsPage() {
           </div>
 
           {/* Empty state hint */}
-          {activeGroups.length === 0 && (
+          {groups.length === 0 && !loading && (
             <motion.div
               className="text-center py-16"
               initial={{ opacity: 0 }}
@@ -121,7 +158,11 @@ export default function GroupsPage() {
         </div>
       </main>
 
-      <CreateGroupDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
+      <CreateGroupDialog 
+        open={createGroupOpen} 
+        onOpenChange={setCreateGroupOpen}
+        onGroupCreated={loadGroups}
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,7 @@ import { AIMessage } from "@/components/ai-message"
 import { UserMessage } from "@/components/user-message"
 import { AppNavigation } from "@/components/app-navigation"
 import { GroupHeader } from "@/components/group-header"
+import { api, type Message as APIMessage } from "@/lib/api"
 
 interface Message {
   id: string
@@ -26,134 +28,132 @@ interface Message {
 
 export default function ChatPage({ params }: { params: { id: string } }) {
   const { id } = use(params)
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerType, setDrawerType] = useState<"card" | "split" | "tracker" | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [chatType, setChatType] = useState<"solo" | "group">("solo")
 
-  const isGroupChat = id.startsWith("group")
+  // Parse chat ID (handle numeric IDs only)
+  const chatId = parseInt(id)
+  const isGroupChat = chatType === "group"
   const [groupMembers] = useState([
     { name: "You", email: "you@example.com" },
     { name: "Alex Chen", email: "alex@example.com" },
     { name: "Jordan Smith", email: "jordan@example.com" },
   ])
 
-  const [messages, setMessages] = useState<Message[]>(
-    isGroupChat
-      ? [
-          {
-            id: "1",
-            type: "ai",
-            content: "I'm analyzing your group conversation. I'll help you plan, split costs, and optimize payments.",
-          },
-          {
-            id: "2",
-            type: "user",
-            content: "Hey everyone! Should we book that Airbnb for the weekend trip?",
-            sender: { name: "Alex Chen", email: "alex@example.com" },
-          },
-          {
-            id: "3",
-            type: "user",
-            content: "Yeah I'm in! It's $450 total right?",
-            sender: { name: "Jordan Smith", email: "jordan@example.com" },
-          },
-        ]
-      : [
-          {
-            id: "1",
-            type: "ai",
-            content:
-              "Hi! I'm Lattice, your financial AI co-pilot. Ask me about card recommendations, splitting bills, or tracking prices.",
-          },
-        ],
-  )
-  const [input, setInput] = useState("")
+  // Load chat from backend
+  useEffect(() => {
+    loadChat()
+  }, [id])
 
-  const simulateAIResponse = (userInput: string) => {
-    // Simulate thinking stages
-    const thinkingId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  const loadChat = async () => {
+    // Validate chat ID
+    if (isNaN(chatId)) {
+      console.error("Invalid chat ID:", id)
+      router.push("/chat/1") // Redirect to default chat
+      return
+    }
 
-    const thinkingStages = isGroupChat
-      ? ["Understanding group context...", "Analyzing conversation...", "Calculating optimal splits..."]
-      : ["Checking your cards...", "Comparing rewards and balances..."]
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: thinkingId,
-        type: "ai",
-        content: "",
-        thinking: thinkingStages,
-      },
-    ])
-
-    // After 2 seconds, show final response
-    setTimeout(() => {
-      let response = {
-        content: "I can help you with that! Try asking about card recommendations or splitting receipts.",
-        action: undefined as "card" | "split" | "tracker" | undefined,
+    try {
+      setLoading(true)
+      const chatData = await api.getChat(chatId)
+      
+      // Set chat type based on response
+      if (chatData.type) {
+        setChatType(chatData.type as "solo" | "group")
       }
-
-      if (isGroupChat) {
-        if (userInput.toLowerCase().includes("airbnb") || userInput.toLowerCase().includes("book")) {
-          response = {
-            content:
-              "I see you're planning an Airbnb. Split $450 three ways = $150 each. Alex should use Chase Sapphire for 3x points on travel.",
-            action: "split" as const,
-          }
-        } else if (userInput.toLowerCase().includes("dinner") || userInput.toLowerCase().includes("restaurant")) {
-          response = {
-            content: "For dining, I recommend splitting evenly. The person paying should use Amex Gold for 4x points.",
-            action: "split" as const,
-          }
-        }
-      } else {
-        if (userInput.toLowerCase().includes("card")) {
-          response = {
-            content: "Use Discover — you'll earn $12 cashback.",
-            action: "card" as const,
-          }
-        } else if (userInput.toLowerCase().includes("split")) {
-          response = {
-            content: "I've parsed the receipt. Here's the suggested split.",
-            action: "split" as const,
-          }
-        }
+      
+      // Convert backend messages to component format
+      const formattedMessages: Message[] = chatData.messages?.map((msg: APIMessage) => ({
+        id: msg.id.toString(),
+        type: msg.sender_type as "user" | "ai",
+        content: msg.content,
+        thinking: msg.thinking,
+        action: msg.action as "card" | "split" | "tracker" | undefined,
+        sender: msg.sender_type === "user" && chatData.type === "group"
+          ? { name: "User", email: "user@example.com" }
+          : undefined,
+      })) || []
+      
+      setMessages(formattedMessages)
+    } catch (error) {
+      console.error("Failed to load chat:", error)
+      // If unauthorized, redirect to login
+      if (error instanceof Error && error.message.includes("401")) {
+        router.push("/login")
       }
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === thinkingId
-            ? {
-                ...msg,
-                content: response.content,
-                thinking: undefined,
-                action: response.action,
-              }
-            : msg,
-        ),
-      )
-
-      if (response.action) {
-        setDrawerType(response.action)
-        setDrawerOpen(true)
-      }
-    }, 2000)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleSend = () => {
-    if (!input.trim()) return
+  const handleSend = async () => {
+    if (!input.trim() || sending) return
 
     const userMessage: Message = {
-      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      id: `temp-${Date.now()}`,
       type: "user",
       content: input,
       sender: isGroupChat ? { name: "You", email: "you@example.com" } : undefined,
     }
 
+    // Add user message immediately
     setMessages((prev) => [...prev, userMessage])
-    simulateAIResponse(input)
+    const messageContent = input
     setInput("")
+    setSending(true)
+
+    try {
+      // Send message to backend
+      await api.sendMessage(chatId, messageContent)
+      
+      // Reload chat to get AI response
+      const chatData = await api.getChat(chatId)
+      
+      // Convert backend messages to component format
+      const formattedMessages: Message[] = chatData.messages?.map((msg: APIMessage) => ({
+        id: msg.id.toString(),
+        type: msg.sender_type as "user" | "ai",
+        content: msg.content,
+        thinking: msg.thinking,
+        action: msg.action as "card" | "split" | "tracker" | undefined,
+        sender: msg.sender_type === "user" && isGroupChat 
+          ? { name: "User", email: "user@example.com" }
+          : undefined,
+      })) || []
+      
+      setMessages(formattedMessages)
+      
+      // Check if AI response has an action
+      const lastMessage = formattedMessages[formattedMessages.length - 1]
+      if (lastMessage && lastMessage.type === "ai" && lastMessage.action) {
+        setDrawerType(lastMessage.action)
+        setDrawerOpen(true)
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error)
+      // Remove temporary message on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== userMessage.id))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading chat...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -194,6 +194,14 @@ export default function ChatPage({ params }: { params: { id: string } }) {
                 )}
               </div>
             ))}
+            {sending && (
+              <div>
+                <AIMessage 
+                  content="" 
+                  thinking={["Processing your request...", "Analyzing...", "Generating response..."]} 
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -203,11 +211,12 @@ export default function ChatPage({ params }: { params: { id: string } }) {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
               placeholder={isGroupChat ? "Message your group..." : "Ask about cards, splits, or price tracking..."}
               className="rounded-full"
+              disabled={sending}
             />
-            <Button onClick={handleSend} size="icon" className="rounded-full shrink-0">
+            <Button onClick={handleSend} size="icon" className="rounded-full shrink-0" disabled={sending}>
               <Send className="w-4 h-4" />
             </Button>
           </div>

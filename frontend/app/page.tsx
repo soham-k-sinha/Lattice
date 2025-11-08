@@ -100,10 +100,10 @@ export default function LandingPage() {
           transition={{ duration: 0.8, delay: 0.4 }}
         >
           <Button asChild size="lg" className="rounded-full px-8 font-medium">
-            <Link href="/chat/main">Get Started</Link>
+            <Link href="/login">Get Started</Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="rounded-full px-8 font-medium bg-transparent">
-            <Link href="/chat/demo">Try Demo</Link>
+            <Link href="/login">Try Demo</Link>
           </Button>
         </motion.div>
       </div>
