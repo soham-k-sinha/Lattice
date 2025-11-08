@@ -72,6 +72,7 @@ Instructions:
 - Use reward structures and credit health factors to reason which card offers the best effective value.
 - Prefer cards with higher category bonuses and balanced utilization.
 - Output the recommendation in this structure:
+- Use a lot of related emojis while explaining your step-by-step reasoning for financial analysis.
 
 ---
 - Category: [Identified category]
