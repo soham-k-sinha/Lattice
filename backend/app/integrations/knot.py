@@ -200,8 +200,32 @@ class KnotClient:
         
         logger.info(f"Fetching accounts for user {external_user_id}")
         result = await self._request("GET", "/accounts/get", params=params)
-        accounts_data = result.get("accounts", [])
-        return [KnotAccount(**a) for a in accounts_data]
+        
+        if isinstance(result, list):
+            accounts_data = result
+        elif isinstance(result, dict):
+            accounts_data = result.get("accounts") or result.get("data") or []
+        else:
+            logger.warning(
+                "Unexpected response type for /accounts/get: %s",
+                type(result).__name__,
+            )
+            accounts_data = []
+        
+        normalized_accounts = []
+        for account in accounts_data:
+            if not isinstance(account, dict):
+                logger.warning("Skipping non-dict account payload: %s", account)
+                continue
+            
+            # Ensure required fields exist / cast to string
+            account = {
+                **account,
+                "merchant_id": str(account.get("merchant_id", "")),
+            }
+            normalized_accounts.append(KnotAccount(**account))
+        
+        return normalized_accounts
     
     # ==================== TRANSACTIONS ====================
     
