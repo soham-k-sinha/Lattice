@@ -237,6 +237,7 @@ curl http://localhost:8000/health
 ```
 
 Open browser to:
+
 - Frontend: `http://localhost:3000`
 - Backend docs: `http://localhost:8000/docs`
 
@@ -317,6 +318,7 @@ After onboarding, you should see:
 ```
 
 If you see errors, check:
+
 1. Knot credentials in `backend/.env`
 2. Backend is running on port 8000
 3. Frontend `.env.local` has correct API URL
@@ -326,6 +328,7 @@ If you see errors, check:
 ## 🎉 Success!
 
 If working correctly:
+
 - ✅ Login page loads at `http://localhost:3000/login`
 - ✅ Backend responds at `http://localhost:8000/health`
 - ✅ Can sign up and connect merchant accounts

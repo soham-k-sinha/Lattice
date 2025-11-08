@@ -120,14 +120,14 @@ export default function OnboardingPage() {
       console.log("🎯 Starting Knot onboarding...");
       setCurrentStep(1);
       // Enable test_mode in development to avoid Knot session conflicts when testing repeatedly
-      const isDevelopment = process.env.NODE_ENV === "development";
+      const isProduction = process.env.NODE_ENV === "production";
       const startResult = await api.startOnboarding(
         userEmail,
         undefined,
-        isDevelopment
+        isProduction
       );
       console.log("✅ Session created:", startResult);
-      if (isDevelopment) {
+      if (isProduction) {
         console.log(
           "🧪 Test mode enabled - using unique session ID to prevent conflicts"
         );
@@ -150,8 +150,8 @@ export default function OnboardingPage() {
       console.log(`🏪 Using merchant ID: ${selectedMerchant}`);
       knotapi.open({
         sessionId: startResult.session_id,
-        clientId: "dda0778d-9486-47f8-bd80-6f2512f9bcdb", // Your Knot client ID
-        environment: startResult.environment as "development" | "production",
+        clientId: "a390e79d-2920-4440-9ba1-b747bc92790b", // Your Knot client ID
+        environment: "production",
         product: "transaction_link",
         merchantIds: [selectedMerchant],
         entryPoint: "onboarding",

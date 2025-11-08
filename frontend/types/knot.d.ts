@@ -3,7 +3,7 @@
  * https://docs.knotapi.com/sdk/web
  */
 
-type Environment = 'development' | 'production'
+type Environment =  'production'
 type Product = 'card_switcher' | 'transaction_link'
 
 interface KnotOpenConfig {

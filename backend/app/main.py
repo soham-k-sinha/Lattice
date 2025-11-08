@@ -79,7 +79,7 @@ async def health_check() -> dict[str, str]:
 
 
 # Import and include routers
-from app.api import accounts, auth, chats, groups, insights, onboarding
+from app.api import accounts, auth, chats, groups, insights, onboarding, transactions
 from app.api import settings as settings_router
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -87,6 +87,7 @@ app.include_router(onboarding.router, prefix="/api/onboarding", tags=["Onboardin
 app.include_router(chats.router, prefix="/api/chats", tags=["Chats"])
 app.include_router(groups.router, prefix="/api/groups", tags=["Groups"])
 app.include_router(accounts.router, prefix="/api/accounts", tags=["Accounts"])
+app.include_router(transactions.router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(insights.router, prefix="/api/insights", tags=["Insights"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
 

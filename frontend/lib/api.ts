@@ -299,6 +299,49 @@ export const api = {
     
     return response.json()
   },
+
+  // ============= Transactions =============
+
+  async syncTransactions(merchantId?: string, limit: number = 100) {
+    const params = new URLSearchParams()
+    if (merchantId) params.set('merchant_id', merchantId)
+    params.set('limit', limit.toString())
+    
+    const response = await fetchWithAuth(`/api/transactions/sync?${params}`)
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Failed to sync transactions')
+    }
+    
+    return response.json()
+  },
+
+  async getTransactions(merchantId?: string, limit: number = 100) {
+    const params = new URLSearchParams()
+    if (merchantId) params.set('merchant_id', merchantId)
+    params.set('limit', limit.toString())
+    
+    const response = await fetchWithAuth(`/api/transactions?${params}`)
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Failed to fetch transactions')
+    }
+    
+    return response.json()
+  },
+
+  async getTransactionDetails(transactionId: string) {
+    const response = await fetchWithAuth(`/api/transactions/${transactionId}`)
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Failed to fetch transaction details')
+    }
+    
+    return response.json()
+  },
   
   // ============= Insights =============
   

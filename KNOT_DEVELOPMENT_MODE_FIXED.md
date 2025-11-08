@@ -57,7 +57,7 @@ Result: ✅ Valid session, no errors!
 
 ```python
 # Knot API
-KNOT_ENVIRONMENT: str = "development"  # or "production"
+KNOT_ENVIRONMENT: str = "production"  # or "production"
 KNOT_API_URL: str = "https://development.knotapi.com"
 KNOT_CLIENT_ID: str = ""
 KNOT_CLIENT_SECRET: str = ""
