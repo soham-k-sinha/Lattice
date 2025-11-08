@@ -7,6 +7,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 import base64
 from loguru import logger
 
@@ -212,19 +213,69 @@ class KnotClient:
             )
             accounts_data = []
         
-        normalized_accounts = []
+        normalized_accounts: List[KnotAccount] = []
         for account in accounts_data:
             if not isinstance(account, dict):
                 logger.warning("Skipping non-dict account payload: %s", account)
                 continue
-            
-            # Ensure required fields exist / cast to string
-            account = {
-                **account,
-                "merchant_id": str(account.get("merchant_id", "")),
-            }
-            normalized_accounts.append(KnotAccount(**account))
-        
+
+            merchant_data = account.get("merchant") or {}
+
+            account_id = (
+                account.get("id")
+                or account.get("merchant_account_id")
+                or account.get("account_id")
+                or merchant_data.get("id")
+            )
+
+            merchant_id_value = (
+                account.get("merchant_id")
+                or merchant_data.get("id")
+            )
+
+            merchant_name_value = (
+                account.get("merchant_name")
+                or merchant_data.get("name")
+                or ""
+            )
+
+            status_value = (
+                account.get("status")
+                or account.get("connection_status")
+                or account.get("state")
+                or "unknown"
+            )
+
+            linked_at_value = (
+                account.get("linked_at")
+                or account.get("connected_at")
+                or account.get("created_at")
+                or datetime.utcnow().isoformat()
+            )
+
+            permissions_value = account.get("permissions") or account.get("products") or {}
+            if isinstance(permissions_value, list):
+                permissions_value = {"items": permissions_value}
+
+            if not account_id or not merchant_id_value:
+                logger.warning(
+                    "Skipping account without id/merchant_id: %s",
+                    account,
+                )
+                continue
+
+            normalized_accounts.append(
+                KnotAccount(
+                    id=str(account_id),
+                    merchant_id=str(merchant_id_value),
+                    merchant_name=str(merchant_name_value),
+                    status=str(status_value),
+                    permissions=permissions_value,
+                    linked_at=str(linked_at_value),
+                    raw=account,
+                )
+            )
+
         return normalized_accounts
     
     # ==================== TRANSACTIONS ====================

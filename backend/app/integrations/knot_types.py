@@ -29,12 +29,14 @@ class KnotMerchant(BaseModel):
 
 class KnotAccount(BaseModel):
     """Account from GET /accounts/get"""
+    model_config = ConfigDict(extra="allow")
+    
     id: str
     merchant_id: str
     merchant_name: str
-    status: str
+    status: Optional[str] = "unknown"
     permissions: Dict[str, Any] = Field(default_factory=dict)
-    linked_at: str
+    linked_at: Optional[str] = None
 
 
 class KnotTransaction(BaseModel):
