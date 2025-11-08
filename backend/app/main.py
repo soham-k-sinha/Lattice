@@ -21,7 +21,9 @@ app.add_middleware(
         "https://lattice-2ulsedyha-aryamangoenkas-projects.vercel.app",  # Vercel deployment
         "https://lattice-rose.vercel.app",  # Vercel production domain
         "https://lattice-aryamangoenkas-projects.vercel.app",  # Vercel alias
-        "https://frontend-mka120fwe-aryamangoenkas-projects.vercel.app",  # Latest deployment
+        "https://frontend-mka120fwe-aryamangoenkas-projects.vercel.app",  # Previous deployment
+        "https://frontend-n2tazkq5v-aryamangoenkas-projects.vercel.app",  # Latest deployment
+        "https://frontend-omega-sepia-46.vercel.app",  # Production domain
         "https://frontend-aryamangoenkas-projects.vercel.app",  # Frontend production domain
         "https://e5e88adea615.ngrok-free.app",  # ngrok tunnel
     ],
