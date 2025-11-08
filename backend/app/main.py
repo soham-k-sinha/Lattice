@@ -1,5 +1,5 @@
 """Main FastAPI application entry point."""
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -15,11 +15,35 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "http://localhost:3001",  # Alternative local port
+        "https://lattice-2ulsedyha-aryamangoenkas-projects.vercel.app",  # Vercel deployment
+        "https://lattice-rose.vercel.app",  # Vercel production domain
+        "https://lattice-aryamangoenkas-projects.vercel.app",  # Vercel alias
+        "https://frontend-mka120fwe-aryamangoenkas-projects.vercel.app",  # Latest deployment
+        "https://frontend-aryamangoenkas-projects.vercel.app",  # Frontend production domain
+        "https://e5e88adea615.ngrok-free.app",  # ngrok tunnel
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*", "ngrok-skip-browser-warning"],
+    expose_headers=["*"],
 )
+
+
+# Add logging middleware for debugging CORS issues
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests to debug CORS issues."""
+    origin = request.headers.get("origin", "No Origin")
+    method = request.method
+    path = request.url.path
+    
+    logger.debug(f"🌐 Request: {method} {path} from origin: {origin}")
+    
+    response = await call_next(request)
+    return response
 
 
 @app.on_event("startup")

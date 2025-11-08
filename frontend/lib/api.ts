@@ -22,6 +22,7 @@ async function fetchWithAuth(url: string, options?: RequestInit) {
       ...options?.headers,
       ...(token && { 'Authorization': `Bearer ${token}` }),
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': '69420',
     },
   })
   
@@ -47,7 +48,10 @@ export const api = {
   async signup(email: string, password: string, name: string) {
     const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '69420',
+      },
       body: JSON.stringify({ email, password, name }),
     })
     
@@ -62,7 +66,10 @@ export const api = {
   async login(email: string, password: string) {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '69420',
+      },
       body: JSON.stringify({ email, password }),
     })
     
