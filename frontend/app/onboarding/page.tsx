@@ -58,15 +58,28 @@ export default function OnboardingPage() {
   useEffect(() => {
     async function loadUser() {
       try {
+        // Check if token exists first
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+          console.error("❌ No access token found in localStorage");
+          setError("Please log in to continue");
+          setTimeout(() => router.push('/login'), 2000);
+          return;
+        }
+        
+        console.log("✅ Token found, fetching user info...");
         const user = await api.getCurrentUser();
+        console.log("✅ User loaded:", user);
         setUserEmail(user.email);
       } catch (err) {
-        console.error("Failed to load user:", err);
-        setError("Please log in to continue");
+        console.error("❌ Failed to load user:", err);
+        setError("Session expired. Please log in again.");
+        localStorage.removeItem('access_token');
+        setTimeout(() => router.push('/login'), 2000);
       }
     }
     loadUser();
-  }, []);
+  }, [router]);
 
   const handleConnect = async () => {
     if (!userEmail) {
