@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Lattice Backend"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = "production"
 
     # Server
     HOST: str = "0.0.0.0"
@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     FEATURE_X: bool = False
 
     # Knot API
-    KNOT_ENVIRONMENT: str = "development"  # or "production"
-    KNOT_API_URL: str = "https://development.knotapi.com"
+    KNOT_ENVIRONMENT: str = "production"  # or "production"
+    KNOT_API_URL: str = "https://production.knotapi.com"
     KNOT_CLIENT_ID: str = ""
     KNOT_CLIENT_SECRET: str = ""
 
