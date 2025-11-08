@@ -120,14 +120,14 @@ export default function OnboardingPage() {
       console.log("🎯 Starting Knot onboarding...");
       setCurrentStep(1);
       // Enable test_mode in development to avoid Knot session conflicts when testing repeatedly
-      const isProduction = process.env.NODE_ENV === "production";
+      const isDevelopment = process.env.NODE_ENV !== "production";
       const startResult = await api.startOnboarding(
         userEmail,
         undefined,
-        isProduction
+        isDevelopment
       );
       console.log("✅ Session created:", startResult);
-      if (isProduction) {
+      if (isDevelopment) {
         console.log(
           "🧪 Test mode enabled - using unique session ID to prevent conflicts"
         );
@@ -151,7 +151,7 @@ export default function OnboardingPage() {
       knotapi.open({
         sessionId: startResult.session_id,
         clientId: "a390e79d-2920-4440-9ba1-b747bc92790b", // Your Knot client ID
-        environment: "production",
+        environment: startResult.environment as "development" | "production",
         product: "transaction_link",
         merchantIds: [selectedMerchant],
         entryPoint: "onboarding",
@@ -273,7 +273,10 @@ export default function OnboardingPage() {
                 JSON.stringify(cachedResult, null, 2)
               );
               if (cachedResult.file_path) {
-                console.log("🗂️ Cached transactions file:", cachedResult.file_path);
+                console.log(
+                  "🗂️ Cached transactions file:",
+                  cachedResult.file_path
+                );
               }
               if (cachedResult.transactions?.length) {
                 console.log(
@@ -312,17 +315,19 @@ export default function OnboardingPage() {
         onError: (product, errorCode, errorDescription) => {
           console.error("❌ Knot SDK error:", errorCode, errorDescription);
           setError(`${errorCode}: ${errorDescription}`);
-          setCurrentStep(0);
+          setCurrentStep(0); 
           setLoading(false);
         },
 
         onEvent: (product, event, merchant, merchantId, payload, taskId) => {
+          console.log("HELLOOOOOOOOOOOO", product, event, merchant, merchantId, payload, taskId);
           console.log("📊 Knot event:", event, merchant, merchantId);
         },
 
         onExit: (product) => {
-          console.log("👋 User closed Knot SDK");
-          router.push("/chat/1");
+          console.log("👋 User closed Knot SDK without linking", product);
+          setCurrentStep(0);
+          setShowMerchantSelection(true);
           setLoading(false);
         },
       });
