@@ -1,12 +1,12 @@
 # Backend Requirements From Frontend Surfaces
 
-This document summarizes every backend capability implied by the current Next.js frontend (`frontend/app/**`). Use it as the contract for the MVP server stack we need to implement.
+This document summarizes every backend capability implied by the current Next.js frontend (`frontend/app/**`) and, most importantly, maps each user interaction to the external APIs it must (or must not) call. Treat it as the contract for the MVP backend.
 
 ## 1. High-Level Goals
 
 1. Serve authenticated users who can chat with AI assistants, alone or in groups.
-2. Coordinate multiple AI providers (Dedalus Labs agents, Groq, Gemini) and financial APIs (Knot, X API, Snowflake REST).
-3. Provide CRUD + query endpoints for groups, chats, accounts, insights, and settings.
+2. Coordinate multiple AI providers (Dedalus Labs MCP agents, Groq, Gemini) and financial APIs (Knot, X API, Snowflake REST) without over-calling them.
+3. Expose clear CRUD + query endpoints for groups, chats, accounts, insights, and settings.
 4. Keep the design simple enough for a hackathon MVP while leaving room to evolve.
 
 ## 2. Core Services & Responsibilities
@@ -14,16 +14,46 @@ This document summarizes every backend capability implied by the current Next.js
 | Service | Primary Responsibilities | External Dependencies |
 | --- | --- | --- |
 | API Gateway / BFF | Authn/z, request validation, response shaping for the Next frontend | Frontend, Auth provider |
-| Chat Orchestrator | Persist chat threads, fan out to AI Broker, emit structured replies (`content`, `thinking`, `action`) | AI Broker, Group Service |
+| Chat Orchestrator | Persist chat threads, detect intent, fan out to AI Broker, emit structured replies (`content`, `thinking`, `action`) | AI Broker, Group Service |
 | AI Broker | Route prompts to Dedalus agents, Groq, or Gemini; enforce safety + retries | Dedalus runtime, Groq, Gemini |
+| Knot Integration | Link accounts, fetch merchant-scoped transactions (Amazon, UberEats, DoorDash, etc.), surface account status | Knot API |
 | Group Service | Manage group metadata, memberships, invites, shared context | Postgres |
-| Knot Integration | Link accounts, fetch permissions, surface status for `/accounts` + onboarding | Knot API |
-| Insights Service | Pull Snowflake datasets, compute optimizations, expose summaries | Snowflake REST API |
+| Insights Service | Pull/aggregate Snowflake datasets, compute optimizations, expose summaries | Snowflake REST API |
+| Social Context Adapter | Capture trending topics/deals from X API when explicitly requested | X API |
 | Settings / Profile Service | Store user prefs (notifications, AI toggles) & security options | Postgres |
 
-All of these services can live inside a single backend app for the MVP, but the boundaries clarify modules/classes we need.
+All of these modules can live in one backend app for the MVP, but the seams define where we call external APIs.
 
-## 3. Route-by-Route Requirements
+## 3. When Each External API Is Called
+
+| Scenario | Trigger | External Calls | Notes |
+| --- | --- | --- | --- |
+| Onboarding “Connect with Knot” | User taps Connect button | `POST /knot/link-token`, `POST /knot/token-exchange` | Only once per user unless they unlink accounts. |
+| Viewing Linked Accounts | `/accounts` route loads | `GET /knot/accounts` (scoped) | Cached for 15 min; no need to hit Knot on every click. |
+| Chat about specific purchases (solo) | User mentions “Amazon cart”, “DoorDash order”, “UberEats receipt”, etc. | `GET /knot/transactions?merchant=Amazon|DoorDash|UberEats` | Knot is only called for merchants it supports (these whitelisted commerce providers). Generic banking questions bypass Knot. |
+| Group expense split | Chat intent “split” inside group | `GET /knot/transactions` (merchant filter) + Dedalus Smart Split agent | Only call Knot if we need actual transaction amounts; otherwise rely on user-provided numbers. |
+| Card optimizer | Chat intent “card recommendation” | Dedalus Card Agent → Groq/Gemini fallback + optional `GET /knot/cards` for rewards data | Knot returns available cards + categories; AI chooses best. |
+| Price tracker | Chat intent “price tracking / best time to buy” | Dedalus Price Agent + optionally X API for trend signals | No Knot call; data comes from agents + social context. |
+| Insights dashboard | `/insights` route loads or refresh job runs | `POST /snowflake/sql` for aggregates; optionally X API for trend labels | Run server-side cron to cache results; UI hits cached data. |
+| Social/trend lookup | User explicitly asks “What’s trending on X for flights?” | `GET /x/search` | Do **not** call X unless prompt contains relevant keywords; keep optional. |
+| Settings, Groups, basic chat | Standard CRUD | No external calls (pure Postgres) | These flows stay internal. |
+
+## 4. MCP / AI Agent Architecture
+
+1. **Intent Detection**: Chat Orchestrator examines a message (keywords + conversation state) to decide if it’s:
+   * Reasoning-heavy (card, split, tracker) → Dedalus agent.
+   * General conversation → Groq/Gemini for completion.
+2. **Dedalus MCP Servers**: Provide specialized workflows:
+   * `CardGuru` agent: requires card catalog + merchant category input.
+   * `SplitSense` agent: needs participant list + transaction data (from Knot when available).
+   * `PriceOracle` agent: consumes product metadata + optional social trend signals (X API).
+3. **Orchestration**:
+   * API Gateway → Chat Orchestrator (persist message) → AI Broker.
+   * AI Broker enriches context (calls Postgres, Knot, Snowflake, X per scenario) before invoking an MCP agent.
+   * Agent returns structured payload: `{ content, reasoning[], action, drawerData }`.
+   * Broker streams “thinking” stages back to frontend to drive animations (`frontend/app/chat/[id]/page.tsx`).
+
+## 5. Route-by-Route Requirements & API Usage
 
 ### 3.1 Landing & Navigation (`frontend/app/page.tsx`, `components/app-navigation.tsx`)
 
@@ -33,9 +63,9 @@ All of these services can live inside a single backend app for the MVP, but the 
 ### 3.2 Onboarding (`frontend/app/onboarding/page.tsx`)
 
 * Button triggers “Connect with Knot” flow. Backend must expose:
-  * `POST /api/onboarding/start` → returns Knot link token.
-  * `POST /api/onboarding/complete` → exchanges public token, stores linked accounts.
-* After linking, frontend expects redirect to `/chat/main`. Backend should mark onboarding status to bypass future prompts.
+  * `POST /api/onboarding/start` → server calls Knot Link API to create a token limited to supported commerce merchants (Amazon, UberEats, DoorDash, Lyft/Uber, etc.).
+  * `POST /api/onboarding/complete` → exchanges the public token for access + stores linked accounts.
+* After linking, backend marks `onboardingStatus=complete` so the UI can route to `/chat/main`.
 
 ### 3.3 Chat (`frontend/app/chat/[id]/page.tsx`)
 
@@ -52,12 +82,18 @@ All of these services can live inside a single backend app for the MVP, but the 
   3. Streams thinking messages (optional SSE/WebSocket) or responds with final AI message + drawer payload.
 * `GET /api/chats` → list chats for sidebar search (id, name, type, member count).
 
-**Processing Flow**
+**Processing Flow & API Calls**
 1. API receives user prompt.
-2. Collect context: group members, recent transactions (via Knot), insights (via Snowflake), previous AI steps.
-3. AI Broker selects Dedalus agent when reasoning chain is needed; fall back to Groq/Gemini for generic answers.
-4. Orchestrator saves AI response, flags `action` if card/split/tracker details are attached.
-5. If `action` exists, call the corresponding helper to compute structured data for the drawer.
+2. Intent detection:
+   * **Card** intent → fetch user’s card catalog from Postgres; optionally call Knot Rewards endpoint (if available) for real spend categories; never hits Knot if no merchant context.
+   * **Split** intent → if message references supported merchants (Amazon, UberEats, DoorDash, Airbnb, etc.), call Knot transactions filtered by merchant and date range; otherwise use user-supplied totals.
+   * **Price tracking** intent → no Knot call; instead gather product metadata + optional X API trend data.
+   * **General chat** → no external data.
+3. Chat Orchestrator enriches with group members (Postgres) + cached insights (Snowflake) as needed.
+4. AI Broker selects Dedalus agent or Groq/Gemini:
+   * Dedalus agent may synchronously query Knot data via the broker if not already fetched.
+5. Broker emits thinking stages + final payload (with optional `drawerData` for card/split/tracker).
+6. Context drawer helpers (`ContextDrawer` UI) expect the structured data returned by the agent; no extra API call on render.
 
 ### 3.4 Groups (`frontend/app/groups/page.tsx`, `components/create-group-dialog.tsx`)
 
@@ -72,7 +108,7 @@ All of these services can live inside a single backend app for the MVP, but the 
 
 **Data Sources**
 * Member info stored in Postgres.
-* `context` & `totalSpend` derived from Knot transactions or manual annotations (MVP can stub).
+* `context` & `totalSpend` derived from Knot transactions filtered to group members’ consented merchants. If no Knot data, backend falls back to manual annotations or values entered during group creation.
 
 ### 3.5 Accounts (`frontend/app/accounts/page.tsx`)
 
@@ -80,10 +116,10 @@ All of these services can live inside a single backend app for the MVP, but the 
 * List of linked accounts with permissions and delete option.
 * Sandbox status banner.
 
-**Endpoints**
-* `GET /api/accounts` → list accounts (`name`, `institution`, `permissions`).
-* `DELETE /api/accounts/{accountId}` → revoke integration via Knot.
-* `GET /api/accounts/status` → indicates sandbox vs production mode.
+**Endpoints & Calls**
+* `GET /api/accounts` → backend reads from Postgres first; only if cache older than 15 min does it call Knot’s `GET /accounts`.
+* `DELETE /api/accounts/{accountId}` → server calls Knot revoke endpoint, then deletes local record.
+* `GET /api/accounts/status` → pure internal flag (no external call).
 
 ### 3.6 Insights (`frontend/app/insights/page.tsx`)
 
@@ -91,9 +127,11 @@ All of these services can live inside a single backend app for the MVP, but the 
 * Cards listing optimization, spending trends, rewards reminders.
 * Monthly summary text block.
 
-**Backend**
-* `GET /api/insights` → returns array with type, title, description, metrics. Implement by querying Snowflake REST API (or mock dataset) and applying business rules.
-* `GET /api/insights/summary` → text summary string.
+**Backend & Calls**
+* `GET /api/insights` → returns cached data refreshed every 15 minutes by a background job:
+  1. Job runs `POST /snowflake/sql` queries (spend by category, rewards earned, group trend deltas).
+  2. Optional call to X API if we need trending labels (e.g., “group spending up 23%” with reference to social chatter). Only made when insights mention trends/travel.
+* `GET /api/insights/summary` → serves the latest cached summary; no live call.
 
 ### 3.7 Settings (`frontend/app/settings/page.tsx`)
 
@@ -101,7 +139,7 @@ All of these services can live inside a single backend app for the MVP, but the 
 * Buttons currently inert; backend should expose:
   * `GET /api/settings` → structure matching `settingSections`.
   * `PATCH /api/settings` (per section) to update preferences.
-* Sign-out should call `POST /api/logout`.
+* Sign-out should call `POST /api/logout`. No third-party APIs.
 
 ## 4. Data Model Sketch
 
@@ -136,30 +174,38 @@ MVP can store everything in a single relational DB (Supabase, Neon, etc.).
 
 ## 5. External API Touchpoints
 
-1. **Knot API**
-   * Create Link sessions (`/onboarding/start`).
-   * Exchange tokens and sync accounts.
-   * Fetch transactions to inform splits/insights.
+1. **Knot API (Commerce-Focused)**
+   * Link/token lifecycle during onboarding.
+   * Fetch accounts & permissions for `/accounts`.
+   * Fetch transaction history **only** for supported merchants (Amazon, UberEats, DoorDash, Lyft/Uber, Airbnb) when a chat/group explicitly references them.
+   * Pull rewards/category metadata for card optimizer.
 
-2. **Dedalus Labs Agents**
-   * Provide specialized reasoning flows (card choice, smart split, tracker). Expect to send contextual payload + get structured output (content + drawer data).
+2. **Dedalus Labs MCP Agents**
+   * Provide specialized reasoning flows (card choice, smart split, tracker); require contextual payload assembled by the AI Broker.
+   * Never call external APIs directly; they receive already-fetched data from the broker.
 
 3. **Groq / Gemini**
-   * General-purpose completions; use as fallback models in the AI Broker.
+   * General-purpose LLM completions for open-ended chat; fallback if Dedalus agents unavailable.
 
 4. **X API**
-   * Optional context (social signals, trending offers). Wrap in caching layer to respect rate limits.
+   * Optional context (trending deals, travel chatter) when a message contains keywords like “trending on X/twitter” or “what are people saying”.
+   * Use short-lived cached responses to avoid rate limits.
 
 5. **Snowflake REST API**
    * Query aggregated spend/reward data to populate Insights cards and monthly summary.
+   * Run only in background jobs or when the cache is stale, not on every page load.
 
 ## 6. Processing Pipelines
 
 ### Chat Message Pipeline
 1. `POST /api/chats/{id}/messages` stores the user message.
-2. Push job into in-process queue (or direct call for MVP).
-3. AI Broker orchestrates Dedalus/Groq/Gemini calls.
-4. If card/split/tracker action detected, enrich with Knot/Snowflake data.
+2. Intent detection determines which external data is required:
+   * Merchant-specific? → fetch Knot transactions (commerce merchants only).
+   * Group spend? → use cached Snowflake insight + optional Knot data.
+   * Trend question? → call X API.
+   * Otherwise → no external call.
+3. AI Broker orchestrates Dedalus/Groq/Gemini with the enriched context.
+4. If card/split/tracker action detected, attach drawer payload returned by the agent (already informed by Knot/Snowflake data).
 5. Save AI response + drawer payload, return to client.
 
 ### Group Creation
