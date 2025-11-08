@@ -3,8 +3,8 @@
  * https://docs.knotapi.com/sdk/web
  */
 
-type Environment =  'production'
-type Product = 'card_switcher' | 'transaction_link'
+type Environment = 'development' | 'production'
+type Product = 'transaction_link'
 
 interface KnotOpenConfig {
   sessionId: string
@@ -18,7 +18,10 @@ interface KnotOpenConfig {
   cardName?: string
   customerName?: string
   logoId?: number
-  onSuccess?: (product: Product, details: { merchantName: string }) => void
+  onSuccess?: (
+    product: Product,
+    details: { merchantName: string; merchantId?: number }
+  ) => void
   onError?: (product: Product, errorCode: string, errorDescription: string) => void
   onEvent?: (
     product: Product,

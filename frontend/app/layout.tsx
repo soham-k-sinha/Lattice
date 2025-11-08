@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import Script from "next/script"
 import "./globals.css"
 
@@ -29,7 +28,6 @@ export default function RootLayout({
       </head>
       <body className={`${geist.className} antialiased`} suppressHydrationWarning>
         {children}
-        <Analytics />
       </body>
     </html>
   )

@@ -239,6 +239,9 @@ export default function OnboardingPage() {
                 "🧾 Raw sync response:",
                 JSON.stringify(syncResult, null, 2)
               );
+              if (syncResult.file_path) {
+                console.log("🗂️ Transactions saved to:", syncResult.file_path);
+              }
               if (syncResult.transactions?.length) {
                 console.log(
                   `🧾 Retrieved ${syncResult.transactions.length} transaction(s)`
@@ -269,6 +272,9 @@ export default function OnboardingPage() {
                 "📚 Cached transactions response:",
                 JSON.stringify(cachedResult, null, 2)
               );
+              if (cachedResult.file_path) {
+                console.log("🗂️ Cached transactions file:", cachedResult.file_path);
+              }
               if (cachedResult.transactions?.length) {
                 console.log(
                   `📚 Cached ${cachedResult.transactions.length} transaction(s) available`

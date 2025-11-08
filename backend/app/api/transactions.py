@@ -1,6 +1,8 @@
 """Transactions API routes - Fetch and sync transaction data from Knot"""
 from typing import Any, Optional, Dict
 from datetime import datetime
+from pathlib import Path
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from loguru import logger
@@ -14,6 +16,21 @@ router = APIRouter()
 # In-memory storage for transactions (use database in production)
 # Structure: { user_id: { merchant_id: { "transactions": [...], "next_cursor": str, "limit": int, "synced_at": ts } } }
 TRANSACTIONS_CACHE: dict[int, Dict[str, Dict[str, Any]]] = {}
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "transactions"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _dump_transactions_to_file(user_id: int, merchant_id: str, payload: Dict[str, Any]) -> Path:
+    """Persist the latest transaction payload to disk for debugging/analysis."""
+    file_path = DATA_DIR / f"user_{user_id}_merchant_{merchant_id}.json"
+    try:
+        with file_path.open("w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
+        logger.info("🗂️ Saved transactions to %s", file_path)
+    except Exception as dump_err:
+        logger.error("Failed to write transactions file %s: %s", file_path, dump_err)
+    return file_path
 
 
 @router.get("/sync")
@@ -112,6 +129,18 @@ async def sync_transactions(
             "synced_at": datetime.utcnow().isoformat(),
             "merchant": merchant_payload,
         }
+        file_path = _dump_transactions_to_file(
+            current_user.id,
+            merchant_id_str,
+            {
+                "synced_at": user_cache[merchant_id_str]["synced_at"],
+                "merchant": merchant_payload,
+                "transactions": transactions_payload,
+                "next_cursor": sync_response.next_cursor,
+                "has_more": sync_response.has_more,
+                "limit": sync_response.limit or limit,
+            },
+        )
         
         return {
             "success": True,
@@ -123,6 +152,7 @@ async def sync_transactions(
             "limit": sync_response.limit or limit,
             "cursor": sync_response.next_cursor,
             "synced_at": user_cache[merchant_id_str]["synced_at"],
+            "file_path": str(file_path),
         }
         
     except KnotAPIError as e:
@@ -168,6 +198,9 @@ async def get_transactions(
             "next_cursor": merchant_cache.get("next_cursor"),
             "limit": merchant_cache.get("limit"),
             "synced_at": merchant_cache.get("synced_at"),
+            "file_path": str(DATA_DIR / f"user_{current_user.id}_merchant_{merchant_id_str}.json")
+            if merchant_cache
+            else None,
             "cached": True,
             "message": "Use /transactions/sync to fetch fresh data from Knot" if not transactions else None,
         }
