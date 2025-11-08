@@ -39,19 +39,25 @@ class KnotAccount(BaseModel):
 
 class KnotTransaction(BaseModel):
     """Transaction from POST /transactions/sync"""
+    model_config = ConfigDict(extra="allow")
+
     id: str
-    merchant_id: str
-    amount: float
-    currency: str = "USD"
-    description: str
-    date: str
-    category: Optional[str] = None
+    merchant_id: Optional[str] = None
+    external_id: Optional[str] = None
+    datetime: Optional[str] = None
+    url: Optional[str] = None
+    order_status: Optional[str] = None
+    payment_methods: Optional[List[Dict[str, Any]]] = None
+    price: Optional[Dict[str, Any]] = None
+    products: Optional[List[Dict[str, Any]]] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class KnotTransactionSyncResponse(BaseModel):
     """Response from POST /transactions/sync"""
+    merchant: Optional[Dict[str, Any]] = None
     transactions: List[KnotTransaction]
     next_cursor: Optional[str] = None
-    has_more: bool = False
+    has_more: Optional[bool] = None
+    limit: Optional[int] = None
 

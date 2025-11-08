@@ -1,5 +1,5 @@
 """Transactions API routes - Fetch and sync transaction data from Knot"""
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -12,7 +12,8 @@ from app.integrations.knot import KnotClient, KnotAPIError
 router = APIRouter()
 
 # In-memory storage for transactions (use database in production)
-TRANSACTIONS_CACHE: dict[int, list[dict]] = {}
+# Structure: { user_id: { merchant_id: { "transactions": [...], "next_cursor": str, "limit": int, "synced_at": ts } } }
+TRANSACTIONS_CACHE: dict[int, Dict[str, Dict[str, Any]]] = {}
 
 
 @router.get("/sync")
@@ -40,82 +41,88 @@ async def sync_transactions(
             return {
                 "success": False,
                 "message": "No linked accounts found. Please complete onboarding first.",
+                "merchant": None,
                 "transactions": [],
-                "accounts": [],
             }
         
         logger.info(f"User {current_user.id} has {len(accounts)} linked accounts")
         
-        # If specific merchant requested, filter to that one
+        # Determine merchant to sync
+        selected_account = None
         if merchant_id:
-            accounts = [acc for acc in accounts if str(acc.merchant_id) == str(merchant_id)]
-            if not accounts:
+            merchant_id_str = str(merchant_id)
+            for acc in accounts:
+                if str(acc.merchant_id) == merchant_id_str:
+                    selected_account = acc
+                    break
+            if not selected_account:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Merchant {merchant_id} not linked for this user"
                 )
+        else:
+            # Default to the first linked merchant
+            selected_account = accounts[0]
+            logger.info(
+                "No merchant_id provided, defaulting to merchant %s (%s)",
+                selected_account.merchant_id,
+                selected_account.merchant_name,
+            )
         
-        # Sync transactions for each account
-        all_transactions = []
-        sync_results = []
+        merchant_id_str = str(selected_account.merchant_id)
         
-        for account in accounts:
-            try:
-                logger.info(f"Syncing transactions for merchant {account.merchant_id} ({account.merchant_name})")
-                
-                # Call Knot API to sync transactions
-                sync_response = await knot.sync_transactions(
-                    external_user_id=str(current_user.id),
-                    merchant_id=str(account.merchant_id),
-                    cursor=cursor,
-                    limit=limit,
-                )
-                
-                logger.info(f"✅ Synced {len(sync_response.transactions)} transactions from {account.merchant_name}")
-                
-                # Add merchant info to each transaction
-                for txn in sync_response.transactions:
-                    txn_data = txn.dict() if hasattr(txn, 'dict') else txn
-                    txn_data["merchant_name"] = account.merchant_name
-                    txn_data["merchant_id"] = account.merchant_id
-                    all_transactions.append(txn_data)
-                
-                sync_results.append({
-                    "merchant_id": account.merchant_id,
-                    "merchant_name": account.merchant_name,
-                    "count": len(sync_response.transactions),
-                    "has_more": sync_response.has_more,
-                    "next_cursor": sync_response.next_cursor,
-                })
-                
-            except KnotAPIError as e:
-                logger.error(f"Failed to sync {account.merchant_name}: {e}")
-                sync_results.append({
-                    "merchant_id": account.merchant_id,
-                    "merchant_name": account.merchant_name,
-                    "error": str(e),
-                    "count": 0,
-                })
+        logger.info(
+            f"Syncing transactions for user {current_user.id}, merchant {selected_account.merchant_id} ({selected_account.merchant_name})"
+        )
         
-        # Cache transactions in memory
-        TRANSACTIONS_CACHE[current_user.id] = all_transactions
+        sync_response = await knot.sync_transactions(
+            external_user_id=str(current_user.id),
+            merchant_id=str(selected_account.merchant_id),
+            cursor=cursor,
+            limit=limit,
+        )
         
-        logger.info(f"✅ Total synced: {len(all_transactions)} transactions")
+        transactions_payload = []
+        for txn in sync_response.transactions:
+            txn_payload = txn.model_dump() if hasattr(txn, "model_dump") else dict(txn)
+            # Ensure merchant metadata is populated
+            txn_payload.setdefault("merchant_id", selected_account.merchant_id)
+            txn_payload.setdefault("merchant_name", selected_account.merchant_name)
+            transactions_payload.append(txn_payload)
+        
+        merchant_payload = sync_response.merchant or {
+            "id": int(selected_account.merchant_id)
+            if str(selected_account.merchant_id).isdigit()
+            else selected_account.merchant_id,
+            "name": selected_account.merchant_name,
+        }
+        
+        logger.info(
+            "✅ Synced %s transaction(s) for merchant %s",
+            len(transactions_payload),
+            merchant_payload.get("name"),
+        )
+        
+        # Cache results
+        user_cache = TRANSACTIONS_CACHE.setdefault(current_user.id, {})
+        user_cache[merchant_id_str] = {
+            "transactions": transactions_payload,
+            "next_cursor": sync_response.next_cursor,
+            "limit": sync_response.limit or limit,
+            "synced_at": datetime.utcnow().isoformat(),
+            "merchant": merchant_payload,
+        }
         
         return {
             "success": True,
-            "transactions": all_transactions,
-            "total_count": len(all_transactions),
-            "synced_merchants": sync_results,
-            "accounts": [
-                {
-                    "id": acc.id,
-                    "merchant_id": acc.merchant_id,
-                    "merchant_name": acc.merchant_name,
-                    "status": acc.status,
-                }
-                for acc in accounts
-            ],
+            "merchant": merchant_payload,
+            "transactions": transactions_payload,
+            "total_count": len(transactions_payload),
+            "next_cursor": sync_response.next_cursor,
+            "has_more": sync_response.has_more,
+            "limit": sync_response.limit or limit,
+            "cursor": sync_response.next_cursor,
+            "synced_at": user_cache[merchant_id_str]["synced_at"],
         }
         
     except KnotAPIError as e:
@@ -147,24 +154,37 @@ async def get_transactions(
     Returns transactions from cache. Call /sync first to fetch fresh data.
     """
     
-    user_transactions = TRANSACTIONS_CACHE.get(current_user.id, [])
+    user_cache = TRANSACTIONS_CACHE.get(current_user.id, {})
     
-    # Filter by merchant if requested
     if merchant_id:
-        user_transactions = [
-            txn for txn in user_transactions 
-            if str(txn.get("merchant_id")) == str(merchant_id)
-        ]
+        merchant_id_str = str(merchant_id)
+        merchant_cache = user_cache.get(merchant_id_str, {})
+        transactions = merchant_cache.get("transactions", [])[:limit]
+        return {
+            "success": True,
+            "transactions": transactions,
+            "total_count": len(transactions),
+            "merchant": merchant_cache.get("merchant"),
+            "next_cursor": merchant_cache.get("next_cursor"),
+            "limit": merchant_cache.get("limit"),
+            "synced_at": merchant_cache.get("synced_at"),
+            "cached": True,
+            "message": "Use /transactions/sync to fetch fresh data from Knot" if not transactions else None,
+        }
     
-    # Apply limit
-    user_transactions = user_transactions[:limit]
+    # Aggregate all merchants
+    aggregated_transactions = []
+    for merchant_data in user_cache.values():
+        aggregated_transactions.extend(merchant_data.get("transactions", []))
+    
+    aggregated_transactions = aggregated_transactions[:limit]
     
     return {
         "success": True,
-        "transactions": user_transactions,
-        "total_count": len(user_transactions),
+        "transactions": aggregated_transactions,
+        "total_count": len(aggregated_transactions),
         "cached": True,
-        "message": "Use /transactions/sync to fetch fresh data from Knot" if not user_transactions else None,
+        "message": "Use /transactions/sync?merchant_id=<id> to fetch fresh data for a specific merchant",
     }
 
 

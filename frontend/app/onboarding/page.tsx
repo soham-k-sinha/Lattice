@@ -222,6 +222,67 @@ export default function OnboardingPage() {
               console.error("❌ Error message:", verifyErr.message);
             }
 
+            // Sync transactions for the selected merchant (and log everything)
+            const merchantIdParam =
+              selectedMerchant !== null ? String(selectedMerchant) : undefined;
+            console.log(
+              "🧾 Preparing to sync transactions for merchant:",
+              merchantIdParam
+            );
+            try {
+              const syncResult = await api.syncTransactions(
+                merchantIdParam,
+                100
+              );
+              console.log("🧾 syncTransactions SUCCESS!");
+              console.log(
+                "🧾 Raw sync response:",
+                JSON.stringify(syncResult, null, 2)
+              );
+              if (syncResult.transactions?.length) {
+                console.log(
+                  `🧾 Retrieved ${syncResult.transactions.length} transaction(s)`
+                );
+                console.log(
+                  "🧾 Sample transaction:",
+                  syncResult.transactions[0]
+                );
+              } else {
+                console.warn(
+                  "⚠️ syncTransactions returned no transactions for this merchant"
+                );
+              }
+            } catch (syncErr: any) {
+              console.error("❌ syncTransactions failed:", syncErr);
+              console.error("❌ Error message:", syncErr.message);
+            }
+
+            // Fetch cached transactions for additional logging
+            console.log("📚 Fetching cached transactions after sync...");
+            try {
+              const cachedResult = await api.getTransactions(
+                merchantIdParam,
+                50
+              );
+              console.log("📚 getTransactions SUCCESS!");
+              console.log(
+                "📚 Cached transactions response:",
+                JSON.stringify(cachedResult, null, 2)
+              );
+              if (cachedResult.transactions?.length) {
+                console.log(
+                  `📚 Cached ${cachedResult.transactions.length} transaction(s) available`
+                );
+              } else {
+                console.warn(
+                  "⚠️ No cached transactions found even after sync. Check Knot dashboard."
+                );
+              }
+            } catch (cachedErr: any) {
+              console.error("❌ getTransactions failed:", cachedErr);
+              console.error("❌ Error message:", cachedErr.message);
+            }
+
             // Redirect to chat page
             console.log("⏳ Will redirect in 2 seconds...");
             setTimeout(() => {
