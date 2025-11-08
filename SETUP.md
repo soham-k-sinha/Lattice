@@ -1,6 +1,6 @@
 # Lattice Setup Guide
 
-Complete guide to set up and run Lattice (Frontend + Backend) from GitHub.
+Quick setup guide to run Lattice frontend and backend locally.
 
 ## 🚀 Quick Start
 
@@ -9,125 +9,142 @@ Complete guide to set up and run Lattice (Frontend + Backend) from GitHub.
 git clone <your-repo-url>
 cd code-2
 
-# Run setup script (creates .env files, installs dependencies)
+# Run setup script
 chmod +x setup.sh
 ./setup.sh
 
-# Start both services
-npm run dev:all
+# Start backend
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload
+
+# Start frontend (new terminal)
+cd frontend && pnpm dev
 ```
 
 ---
 
 ## 📋 Prerequisites
 
-Before you begin, ensure you have the following installed:
-
-- **Node.js** (v18 or higher) - [Download](https://nodejs.org/)
-- **Python** (v3.9 or higher) - [Download](https://www.python.org/)
+- **Node.js** (v18+) - [Download](https://nodejs.org/)
+- **pnpm** - Install with: `npm install -g pnpm`
+- **Python** (v3.9+) - [Download](https://www.python.org/)
 - **pip** (Python package manager)
-- **Git** - [Download](https://git-scm.com/)
 
 ### Verify installations:
 
 ```bash
 node --version    # Should be v18+
+pnpm --version
 python3 --version # Should be 3.9+
 pip3 --version
-git --version
 ```
 
 ---
 
-## 🔧 Manual Setup
-
-If you prefer to set up manually:
-
-### 1. Clone the Repository
+## 🔧 Backend Setup
 
 ```bash
-git clone <your-repo-url>
-cd code-2
-```
-
-### 2. Backend Setup (FastAPI)
-
-```bash
-# Navigate to backend directory
 cd backend
 
 # Create Python virtual environment
 python3 -m venv venv
 
 # Activate virtual environment
-# On Mac/Linux:
-source venv/bin/activate
-# On Windows:
-# venv\Scripts\activate
+source venv/bin/activate  # Mac/Linux
+# venv\Scripts\activate   # Windows
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Create .env file
 cat > .env << EOL
-# Application Settings
 APP_NAME="Lattice Backend API"
-APP_VERSION="1.0.0"
 ENVIRONMENT="development"
 DEBUG=true
-
-# Security
-SECRET_KEY="your-super-secret-key-change-this-in-production"
-
-# Database (SQLite for now)
+SECRET_KEY="your-secret-key-here"
 DATABASE_URL="sqlite:///./lattice.db"
 
-# CORS Origins
-CORS_ORIGINS=["http://localhost:3000","http://localhost:3001"]
-
-# Knot API Integration
-KNOT_API_KEY="your-knot-api-key-here"
+# Knot API
+KNOT_API_KEY="your-knot-api-key"
 KNOT_CLIENT_ID="dda0778d-9486-47f8-bd80-6f2512f9bcdb"
 KNOT_ENVIRONMENT="development"
 FEATURE_KNOT=true
-
-# Logging
-LOG_LEVEL="INFO"
 EOL
 
 # Run backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend will be available at: **http://localhost:8000**
+**Backend runs at:** `http://localhost:8000`
+
+### Using ngrok (Optional)
+
+If you need to expose your backend:
+
+```bash
+# Install ngrok
+brew install ngrok  # Mac
+# or download from https://ngrok.com
+
+# Expose backend
+ngrok http 8000
+```
+
+Copy the ngrok URL (e.g., `https://abc123.ngrok-free.app`) for frontend config.
 
 ---
 
-### 3. Frontend Setup (Next.js)
-
-Open a **new terminal window** and run:
+## 🎨 Frontend Setup
 
 ```bash
-# Navigate to frontend directory (from project root)
 cd frontend
 
-# Install dependencies
-npm install
+# Install dependencies with pnpm
+pnpm install
 
-# Create .env.local file
+# Create .env.local
 cat > .env.local << EOL
-# Backend API URL
+# For local backend
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
-# Environment
+# For ngrok backend (if using)
+# NEXT_PUBLIC_API_URL=https://your-ngrok-url.ngrok-free.app
+
 NODE_ENV=development
 EOL
 
 # Run frontend
-npm run dev
+pnpm dev
 ```
 
-Frontend will be available at: **http://localhost:3000**
+**Frontend runs at:** `http://localhost:3000`
+
+---
+
+## 🎯 Running Both Services
+
+### Terminal 1 - Backend
+
+```bash
+cd backend
+source venv/bin/activate
+uvicorn app.main:app --reload
+```
+
+### Terminal 2 - Frontend
+
+```bash
+cd frontend
+pnpm dev
+```
+
+---
+
+## 🔑 Knot API Setup
+
+1. Get your Knot credentials from [knotapi.com](https://knotapi.com/)
+2. Add to `backend/.env`:
+   - `KNOT_API_KEY=your-key-here`
+   - `KNOT_CLIENT_ID=your-client-id`
 
 ---
 
@@ -135,124 +152,123 @@ Frontend will be available at: **http://localhost:3000**
 
 ### Backend (.env)
 
-| Variable | Description | Default/Example |
-|----------|-------------|-----------------|
-| `APP_NAME` | Application name | "Lattice Backend API" |
-| `ENVIRONMENT` | Environment (development/production) | "development" |
-| `SECRET_KEY` | JWT secret key | Generate a secure random string |
-| `DATABASE_URL` | Database connection string | "sqlite:///./lattice.db" |
-| `KNOT_API_KEY` | Your Knot API key | Get from Knot dashboard |
-| `KNOT_CLIENT_ID` | Your Knot Client ID | Get from Knot dashboard |
-| `KNOT_ENVIRONMENT` | Knot environment (development/production) | "development" |
-| `FEATURE_KNOT` | Enable Knot integration | true |
+```bash
+KNOT_API_KEY=your-knot-api-key        # Required
+KNOT_CLIENT_ID=your-client-id         # Required
+SECRET_KEY=any-random-string          # Required
+DATABASE_URL=sqlite:///./lattice.db   # Required
+```
 
 ### Frontend (.env.local)
 
-| Variable | Description | Default/Example |
-|----------|-------------|-----------------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | http://localhost:8000 |
-| `NODE_ENV` | Environment | development |
+```bash
+# Local backend
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# OR ngrok backend
+# NEXT_PUBLIC_API_URL=https://your-ngrok-url.ngrok-free.app
+```
 
 ---
 
-## 🔑 Getting Knot API Credentials
+## 📱 Using the App
 
-1. Sign up at [Knot API](https://knotapi.com/)
-2. Go to your dashboard
-3. Create a new application
-4. Copy your **API Key** and **Client ID**
-5. Add them to your backend `.env` file
+1. Go to `http://localhost:3000/login`
+2. Sign up or log in
+3. Select a merchant (Amazon, Walmart, Target, etc.)
+4. Click "Connect with Knot"
+5. Authenticate and get redirected to chat
 
 ---
 
-## 🚀 Running the Application
+## 🐛 Troubleshooting
 
-### Option 1: Run Both Services Separately
+### Kill ports if already in use
 
-**Terminal 1 - Backend:**
+```bash
+# Backend (port 8000)
+lsof -ti:8000 | xargs kill -9
+
+# Frontend (port 3000)
+lsof -ti:3000 | xargs kill -9
+```
+
+### Backend issues
+
 ```bash
 cd backend
-source venv/bin/activate  # On Mac/Linux
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-**Terminal 2 - Frontend:**
+### Frontend issues
+
 ```bash
 cd frontend
-npm run dev
+rm -rf node_modules pnpm-lock.yaml .next
+pnpm install
+pnpm dev
 ```
 
-### Option 2: Run Both Services Together (Recommended)
+### Knot SDK not loading
 
-From the project root:
+- Check internet connection (SDK loads from CDN)
+- Hard refresh: `Cmd + Shift + R` (Mac) or `Ctrl + Shift + R` (Windows)
+
+### Backend logs
 
 ```bash
-# Make sure backend virtual environment is activated first
-cd backend && source venv/bin/activate && cd ..
-
-# Run both services
-npm run dev:all
+cd backend
+source venv/bin/activate
+uvicorn app.main:app --reload --log-level debug
 ```
 
 ---
 
-## 📱 Using the Application
+## ✅ Verification
 
-### 1. **Sign Up / Login**
-
-Navigate to: http://localhost:3000/login
-
-- Create a new account or login
-- You'll be redirected to the onboarding page
-
-### 2. **Connect Merchant Account**
-
-- Select a merchant (Amazon, Walmart, Target, etc.)
-- Click "Connect with Knot"
-- Complete the merchant authentication
-- You'll be redirected to the chat interface
-
-### 3. **Start Chatting**
-
-- Ask questions about your transactions
-- Get insights and predictions
-- Manage your linked accounts
-
----
-
-## 🧪 Testing Knot Integration
-
-### Check if Knot SDK is loaded:
-
-Open browser console on http://localhost:3000/onboarding and run:
-
-```javascript
-window.KnotapiJS
-```
-
-Should return the Knot SDK object.
-
-### Verify Backend Connection:
+Check if everything is working:
 
 ```bash
-# Check backend health
+# Backend health check
 curl http://localhost:8000/health
 
-# Check API endpoints
-curl http://localhost:8000/
+# Should return: {"status":"healthy"}
 ```
 
-### Test Onboarding Flow:
+Open browser to:
+- Frontend: `http://localhost:3000`
+- Backend docs: `http://localhost:8000/docs`
 
-1. Complete merchant selection
-2. Watch browser console for logs:
-   - `🎯🎯🎯 onSuccess callback FIRED!`
-   - `✅✅✅ completeOnboarding SUCCESS!`
-   - `✅✅✅ SUCCESS: Knot integration working!`
+---
 
-3. Check backend terminal for:
-   - `Fetching accounts for user X from Knot API...`
-   - `✅ Knot returned X accounts`
+## 🔄 Common Commands
+
+### Backend
+
+```bash
+# Start backend
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload
+
+# Stop backend
+Ctrl + C
+```
+
+### Frontend
+
+```bash
+# Start frontend
+cd frontend && pnpm dev
+
+# Build frontend
+pnpm build
+
+# Lint frontend
+pnpm lint
+
+# Stop frontend
+Ctrl + C
+```
 
 ---
 
@@ -262,183 +278,57 @@ curl http://localhost:8000/
 code-2/
 ├── backend/
 │   ├── app/
-│   │   ├── api/           # API routes
-│   │   ├── config/        # Configuration
-│   │   ├── integrations/  # Knot integration
-│   │   ├── middleware/    # Auth middleware
-│   │   ├── models/        # Data models
-│   │   └── main.py        # FastAPI app
+│   │   ├── api/          # API routes
+│   │   ├── integrations/ # Knot integration
+│   │   └── main.py       # FastAPI app
 │   ├── requirements.txt
 │   └── .env
 │
 ├── frontend/
 │   ├── app/
-│   │   ├── login/         # Login page
-│   │   ├── onboarding/    # Merchant connection
-│   │   ├── chat/          # Chat interface
-│   │   └── layout.tsx     # Root layout
-│   ├── components/        # React components
-│   ├── lib/              # API client
+│   │   ├── login/
+│   │   ├── onboarding/   # Merchant selection
+│   │   └── chat/
 │   ├── package.json
 │   └── .env.local
 │
-└── SETUP.md              # This file
+└── SETUP.md
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🆘 Quick Help
 
-### Backend Issues
+### Browser console shows success logs
 
-**Port 8000 already in use:**
-```bash
-# Find and kill the process
-lsof -ti:8000 | xargs kill -9
+After onboarding, you should see:
+
+```
+🎯🎯🎯 onSuccess callback FIRED!
+✅✅✅ completeOnboarding SUCCESS!
+✅✅✅ SUCCESS: Knot integration working!
 ```
 
-**Module not found errors:**
-```bash
-cd backend
-source venv/bin/activate
-pip install -r requirements.txt
+### Backend terminal shows
+
+```
+✅ Knot returned X accounts
+✅ Onboarding complete for user X: X accounts linked
 ```
 
-**Database errors:**
-```bash
-# Delete and recreate database
-rm backend/lattice.db
-# Backend will auto-create on next run
-```
-
-### Frontend Issues
-
-**Port 3000 already in use:**
-```bash
-# Find and kill the process
-lsof -ti:3000 | xargs kill -9
-```
-
-**Module not found errors:**
-```bash
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-```
-
-**Knot SDK not loading:**
-- Check browser console for errors
-- Verify internet connection (SDK loads from CDN)
-- Try hard refresh: `Cmd + Shift + R` (Mac) or `Ctrl + Shift + R` (Windows)
-
-### Hydration Errors (Grammarly Extension)
-
-If you see hydration mismatch warnings:
-1. These are caused by browser extensions (Grammarly, etc.)
-2. They're harmless - the app will still work
-3. To remove them: Disable browser extensions temporarily
-
-### Knot 429 Rate Limit Errors
-
-If you see `429 Bad Request` errors:
-1. Wait 2-3 minutes between onboarding attempts
-2. Don't repeatedly test the same merchant connection
-3. Use development mode (automatically enabled)
-
-### Backend Can't Connect to Knot API
-
-1. Verify your `KNOT_API_KEY` in backend `.env`
-2. Check `KNOT_ENVIRONMENT` is set to "development"
-3. Ensure `FEATURE_KNOT=true`
-4. Check backend logs for detailed error messages
-
----
-
-## 🔒 Security Notes
-
-### For Development:
-- Use the default SQLite database
-- Keep `DEBUG=true` for detailed error messages
-- Use `KNOT_ENVIRONMENT="development"` for testing
-
-### For Production:
-- Change `SECRET_KEY` to a secure random string
-- Set `DEBUG=false`
-- Use PostgreSQL instead of SQLite
-- Update `CORS_ORIGINS` to your production domain
-- Use `KNOT_ENVIRONMENT="production"`
-- Enable HTTPS
-
----
-
-## 📚 API Documentation
-
-Once the backend is running, visit:
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
----
-
-## 🆘 Getting Help
-
-### Check Logs
-
-**Backend logs:**
-- Look at the terminal running `uvicorn`
-- Check for errors with `❌` prefix
-
-**Frontend logs:**
-- Open browser DevTools (F12)
-- Go to Console tab
-- Look for errors (red messages)
-
-### Common Commands
-
-```bash
-# Check if services are running
-lsof -i :8000  # Backend
-lsof -i :3000  # Frontend
-
-# Restart services
-# Backend: Ctrl+C then re-run uvicorn
-# Frontend: Ctrl+C then re-run npm run dev
-
-# View backend logs with more detail
-cd backend
-source venv/bin/activate
-LOG_LEVEL=DEBUG uvicorn app.main:app --reload
-
-# Clear frontend cache
-cd frontend
-rm -rf .next
-npm run dev
-```
-
----
-
-## ✅ Verification Checklist
-
-Before reporting issues, verify:
-
-- [ ] Node.js v18+ installed
-- [ ] Python 3.9+ installed
-- [ ] Backend `.env` file exists with all variables
-- [ ] Frontend `.env.local` file exists
-- [ ] Backend running on port 8000 (`curl http://localhost:8000/health`)
-- [ ] Frontend running on port 3000 (browser opens)
-- [ ] Knot API credentials are valid
-- [ ] No other services using ports 3000 or 8000
+If you see errors, check:
+1. Knot credentials in `backend/.env`
+2. Backend is running on port 8000
+3. Frontend `.env.local` has correct API URL
 
 ---
 
 ## 🎉 Success!
 
-If everything is working:
-1. You should see the login page at http://localhost:3000/login
-2. Backend should respond at http://localhost:8000/health
-3. You can sign up, onboard, and connect merchant accounts
-4. Browser console shows successful Knot integration logs
+If working correctly:
+- ✅ Login page loads at `http://localhost:3000/login`
+- ✅ Backend responds at `http://localhost:8000/health`
+- ✅ Can sign up and connect merchant accounts
+- ✅ Console shows successful Knot integration logs
 
 Happy coding! 🚀
-
