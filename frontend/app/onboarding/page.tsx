@@ -4,13 +4,23 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { CheckCircle2, Circle, AlertCircle, Store } from "lucide-react";
 import { api } from "@/lib/api";
 
 const steps = [
   { id: 1, label: "Connecting" },
   { id: 2, label: "Permissions" },
   { id: 3, label: "Linked" },
+];
+
+const merchants = [
+  { name: "Amazon", id: 44 },
+  { name: "Costco", id: 165 },
+  { name: "Doordash", id: 19 },
+  { name: "Instacart", id: 40 },
+  { name: "Target", id: 12 },
+  { name: "Ubereats", id: 36 },
+  { name: "Walmart", id: 45 },
 ];
 
 export default function OnboardingPage() {
@@ -20,6 +30,8 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [sdkLoaded, setSdkLoaded] = useState(false);
+  const [selectedMerchant, setSelectedMerchant] = useState<number | null>(null);
+  const [showMerchantSelection, setShowMerchantSelection] = useState(true);
 
   // Check if Knot SDK is loaded
   useEffect(() => {
@@ -59,14 +71,14 @@ export default function OnboardingPage() {
     async function loadUser() {
       try {
         // Check if token exists first
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem("access_token");
         if (!token) {
           console.error("❌ No access token found in localStorage");
           setError("Please log in to continue");
-          setTimeout(() => router.push('/login'), 2000);
+          setTimeout(() => router.push("/login"), 2000);
           return;
         }
-        
+
         console.log("✅ Token found, fetching user info...");
         const user = await api.getCurrentUser();
         console.log("✅ User loaded:", user);
@@ -74,8 +86,8 @@ export default function OnboardingPage() {
       } catch (err) {
         console.error("❌ Failed to load user:", err);
         setError("Session expired. Please log in again.");
-        localStorage.removeItem('access_token');
-        setTimeout(() => router.push('/login'), 2000);
+        localStorage.removeItem("access_token");
+        setTimeout(() => router.push("/login"), 2000);
       }
     }
     loadUser();
@@ -94,8 +106,14 @@ export default function OnboardingPage() {
       return;
     }
 
+    if (!selectedMerchant) {
+      setError("Please select a merchant to continue.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
+    setShowMerchantSelection(false);
 
     try {
       // Step 1: Get session from backend
@@ -129,38 +147,96 @@ export default function OnboardingPage() {
       // Step 3: Open Knot SDK with configuration
       console.log("🎨 Opening Knot interface...");
       console.log(`🌍 Using Knot environment: ${startResult.environment}`);
+      console.log(`🏪 Using merchant ID: ${selectedMerchant}`);
       knotapi.open({
         sessionId: startResult.session_id,
         clientId: "dda0778d-9486-47f8-bd80-6f2512f9bcdb", // Your Knot client ID
         environment: startResult.environment as "development" | "production",
         product: "transaction_link",
-        merchantIds: [44],
+        merchantIds: [selectedMerchant],
         entryPoint: "onboarding",
         useCategories: true,
         useSearch: true,
 
         onSuccess: async (product, details) => {
+          console.log("🎯🎯🎯 onSuccess callback FIRED! 🎯🎯🎯");
+          console.log("🎯 Product:", product);
+          console.log("🎯 Details:", JSON.stringify(details, null, 2));
+
           try {
-            console.log("🎯 User completed Knot linking!", product, details);
             setCurrentStep(3);
+            console.log("📞 About to call completeOnboarding...");
+            console.log("📞 Session ID:", startResult.session_id);
 
             // Tell backend the user finished linking
             const completeResult = await api.completeOnboarding(
               startResult.session_id
             );
-            console.log("✅ Onboarding complete:", completeResult);
+            console.log("✅✅✅ completeOnboarding response received! ✅✅✅");
             console.log(
-              `🎉 Linked ${completeResult.accounts_linked} account(s)`
+              "✅ Response:",
+              JSON.stringify(completeResult, null, 2)
             );
 
-            // Redirect to accounts page
+            // Check if backend had an error
+            if (!completeResult.success) {
+              throw new Error(
+                completeResult.message || "Backend failed to link accounts"
+              );
+            }
+
+            console.log(
+              `🎉 Backend says: Linked ${completeResult.accounts_linked} account(s)`
+            );
+
+            // Warn if no accounts were linked
+            if (completeResult.accounts_linked === 0) {
+              console.warn("⚠️⚠️⚠️ WARNING: 0 accounts linked!");
+              console.warn("⚠️ Message:", completeResult.message);
+            }
+
+            // Verify accounts were stored by fetching them
+            console.log("🔍 Now fetching accounts from backend...");
+            try {
+              const accountsResult = await api.getAccounts();
+              console.log("✅ getAccounts SUCCESS!");
+              console.log(
+                "✅ Response:",
+                JSON.stringify(accountsResult, null, 2)
+              );
+
+              if (
+                accountsResult.accounts &&
+                accountsResult.accounts.length > 0
+              ) {
+                console.log("✅✅✅ SUCCESS: Knot integration working! ✅✅✅");
+                console.log("📊 Account details:", accountsResult.accounts);
+              } else {
+                console.warn("⚠️⚠️⚠️ No accounts found! ⚠️⚠️⚠️");
+                console.warn(
+                  "This means Knot session completed but no accounts were saved"
+                );
+              }
+            } catch (verifyErr: any) {
+              console.error("❌ getAccounts failed:", verifyErr);
+              console.error("❌ Error message:", verifyErr.message);
+            }
+
+            // Redirect to chat page
+            console.log("⏳ Will redirect in 2 seconds...");
             setTimeout(() => {
-              console.log("🚀 Redirecting to /accounts...");
-              router.push("/accounts");
-            }, 1000);
+              console.log("🚀 Redirecting to /chat/1...");
+              router.push("/chat/1");
+            }, 2000);
           } catch (err: any) {
-            console.error("❌ Failed to complete onboarding:", err);
-            setError(err.message || "Failed to save linked accounts.");
+            console.error("❌❌❌ completeOnboarding FAILED! ❌❌❌");
+            console.error("❌ Error:", err);
+            console.error("❌ Message:", err.message);
+            console.error("❌ Stack:", err.stack);
+            setError(
+              err.message || "Failed to save linked accounts. Check console."
+            );
+            setShowMerchantSelection(true);
             setCurrentStep(0);
             setLoading(false);
           }
@@ -179,7 +255,7 @@ export default function OnboardingPage() {
 
         onExit: (product) => {
           console.log("👋 User closed Knot SDK");
-          setCurrentStep(0);
+          router.push("/chat/1");
           setLoading(false);
         },
       });
@@ -193,13 +269,15 @@ export default function OnboardingPage() {
 
   const handleRetry = () => {
     setError(null);
-    handleConnect();
+    setShowMerchantSelection(true);
+    setCurrentStep(0);
+    setLoading(false);
   };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-background p-6">
       <motion.div
-        className="w-full max-w-md"
+        className="w-full max-w-2xl"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
@@ -207,7 +285,9 @@ export default function OnboardingPage() {
         <div className="text-center mb-12">
           <h1 className="text-3xl font-semibold mb-3">Connect Your Accounts</h1>
           <p className="text-muted-foreground">
-            Securely link your financial accounts through Knot
+            {showMerchantSelection
+              ? "Choose a merchant to link your account"
+              : "Securely link your financial accounts through Knot"}
           </p>
           {!sdkLoaded && !error && (
             <p className="text-xs text-muted-foreground mt-2">
@@ -216,43 +296,74 @@ export default function OnboardingPage() {
           )}
         </div>
 
-        <div className="space-y-6 mb-12">
-          {steps.map((step, index) => (
-            <motion.div
-              key={step.id}
-              className="flex items-center gap-4"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.1 }}
-            >
-              {currentStep > index ? (
-                <CheckCircle2 className="w-6 h-6 text-accent" />
-              ) : currentStep === index ? (
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 2,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "linear",
-                  }}
+        {showMerchantSelection ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {merchants.map((merchant) => (
+                <motion.button
+                  key={merchant.id}
+                  onClick={() => setSelectedMerchant(merchant.id)}
+                  className={`p-6 rounded-lg border-2 transition-all ${
+                    selectedMerchant === merchant.id
+                      ? "border-accent bg-accent/10"
+                      : "border-border hover:border-accent/50"
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Circle className="w-6 h-6 text-accent" />
-                </motion.div>
-              ) : (
-                <Circle className="w-6 h-6 text-muted-foreground/40" />
-              )}
-              <span
-                className={
-                  currentStep >= index
-                    ? "text-foreground font-medium"
-                    : "text-muted-foreground"
-                }
+                  <div className="flex flex-col items-center gap-3">
+                    <Store
+                      className={`w-8 h-8 ${
+                        selectedMerchant === merchant.id
+                          ? "text-accent"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                    <span className="font-medium">{merchant.name}</span>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6 mb-12">
+            {steps.map((step, index) => (
+              <motion.div
+                key={step.id}
+                className="flex items-center gap-4"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
               >
-                {step.label}
-              </span>
-            </motion.div>
-          ))}
-        </div>
+                {currentStep > index ? (
+                  <CheckCircle2 className="w-6 h-6 text-accent" />
+                ) : currentStep === index ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 2,
+                      repeat: Number.POSITIVE_INFINITY,
+                      ease: "linear",
+                    }}
+                  >
+                    <Circle className="w-6 h-6 text-accent" />
+                  </motion.div>
+                ) : (
+                  <Circle className="w-6 h-6 text-muted-foreground/40" />
+                )}
+                <span
+                  className={
+                    currentStep >= index
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {step.label}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {error && (
           <motion.div
@@ -279,17 +390,19 @@ export default function OnboardingPage() {
           </motion.div>
         )}
 
-        {currentStep === 0 && (
+        {showMerchantSelection && currentStep === 0 && (
           <Button
             onClick={handleConnect}
-            className="w-full rounded-full font-medium"
+            className="w-full rounded-full font-medium mt-6"
             size="lg"
-            disabled={loading || !userEmail || !sdkLoaded}
+            disabled={loading || !userEmail || !sdkLoaded || !selectedMerchant}
           >
             {loading
               ? "Connecting..."
               : !sdkLoaded
               ? "Loading Knot SDK..."
+              : !selectedMerchant
+              ? "Select a Merchant"
               : "Connect with Knot"}
           </Button>
         )}

@@ -27,7 +27,7 @@ export default function RootLayout({
           strategy="beforeInteractive"
         />
       </head>
-      <body className={`${geist.className} antialiased`}>
+      <body className={`${geist.className} antialiased`} suppressHydrationWarning>
         {children}
         <Analytics />
       </body>

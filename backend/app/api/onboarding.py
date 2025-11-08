@@ -156,8 +156,21 @@ async def complete_onboarding(
     # Real Knot integration
     knot = KnotClient()
     try:
+        # Wait a moment for Knot to process the account linking
+        import asyncio
+        logger.info(f"Waiting 2 seconds for Knot to process account linking...")
+        await asyncio.sleep(2)
+        
         # Fetch accounts from Knot
+        logger.info(f"Fetching accounts for user {current_user.id} from Knot API...")
         accounts = await knot.get_accounts(str(current_user.id))
+        logger.info(f"✅ Knot returned {len(accounts)} accounts")
+        
+        if len(accounts) == 0:
+            logger.warning(f"⚠️ Knot returned 0 accounts for user {current_user.id}. This might mean:")
+            logger.warning(f"  1. User didn't complete the linking in Knot SDK")
+            logger.warning(f"  2. Knot is still processing the link (try again in a moment)")
+            logger.warning(f"  3. There was an issue with the Knot session")
         
         # Store in memory
         user_accounts = []
@@ -180,22 +193,36 @@ async def complete_onboarding(
         
         KNOT_LINKED_ACCOUNTS[current_user.id] = user_accounts
         
-        logger.info(f"Onboarding complete for user {current_user.id}: {len(accounts)} accounts linked")
+        logger.info(f"✅ Onboarding complete for user {current_user.id}: {len(accounts)} accounts linked")
         
         return OnboardingCompleteResponse(
             success=True,
             accounts_linked=len(accounts),
-            message=f"Successfully linked {len(accounts)} accounts",
+            message=f"Successfully linked {len(accounts)} accounts" if len(accounts) > 0 else "Session completed but no accounts were linked",
         )
         
     except KnotAPIError as e:
-        logger.error(f"Knot API error: {e}")
-        # Fallback to mock
+        logger.error(f"❌ Knot API error during onboarding complete:")
+        logger.error(f"   Status: {e.status_code}")
+        logger.error(f"   Message: {e.message}")
+        logger.error(f"   Response: {e.response}")
+        
+        # Return error details to frontend
         KNOT_LINKED_ACCOUNTS[current_user.id] = []
         return OnboardingCompleteResponse(
-            success=True,
+            success=False,
             accounts_linked=0,
-            message="Completed with fallback mode",
+            message=f"Knot API Error ({e.status_code}): {e.message}",
+        )
+    except Exception as e:
+        logger.error(f"❌ Unexpected error during onboarding complete: {e}")
+        logger.exception(e)
+        
+        KNOT_LINKED_ACCOUNTS[current_user.id] = []
+        return OnboardingCompleteResponse(
+            success=False,
+            accounts_linked=0,
+            message=f"Unexpected error: {str(e)}",
         )
     finally:
         await knot.close()
