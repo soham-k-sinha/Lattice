@@ -17,7 +17,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Local development
+        "http://127.0.0.1:3000",  # Local development via 127.0.0.1
+        "http://0.0.0.0:3000",  # Docker/local network access
+        "https://localhost:3000",  # HTTPS localhost (dev certs)
         "http://localhost:3001",  # Alternative local port
+        "http://127.0.0.1:3001",  # Alternative local port via 127.0.0.1
         "https://lattice-2ulsedyha-aryamangoenkas-projects.vercel.app",  # Vercel deployment
         "https://lattice-rose.vercel.app",  # Vercel production domain
         "https://lattice-aryamangoenkas-projects.vercel.app",  # Vercel alias

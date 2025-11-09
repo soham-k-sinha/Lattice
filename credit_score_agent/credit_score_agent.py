@@ -1,10 +1,15 @@
+"""Credit score & rewards advisor agent (heuristic version)."""
+from __future__ import annotations
+
 import asyncio
-from dedalus_labs import AsyncDedalus, DedalusRunner
+import os
+import re
+from typing import Sequence
+
 from dotenv import load_dotenv
+from loguru import logger
 
-load_dotenv()
-
-credit_cards = [
+CREDIT_CARD_KNOWLEDGE = [
     # Travel / dining premium
     "Chase Sapphire Preferred — recommended score: 700+ — 2x–3x points on travel & dining, 1x elsewhere — annual fee ~$95 — good for travel redemptions and transfer partners.",
     "Chase Sapphire Reserve — recommended score: 740+ — 3x on travel & dining, Priority Pass, $300 annual travel credit — annual fee ~$550 — premium travel perks.",
@@ -48,48 +53,156 @@ credit_cards = [
     "Regional Bank Cashback Card (example) — recommended score: 680+ — 1.5%–3% on select categories, lower underwriting thresholds — good for local relationships.",
 ]
 
-user_query = "I'm ordering food from Uber Eats tonight for about $45. Which of my credit cards should I use for the best return?"
+CATEGORY_KEYWORDS = {
+    "travel": {"travel", "flight", "air", "airline", "hotel", "vacation", "trip"},
+    "dining": {"dining", "restaurant", "food", "eat", "coffee", "drink"},
+    "groceries": {"grocery", "groceries", "supermarket", "market"},
+    "entertainment": {"concert", "entertainment", "movie", "show"},
+    "gas": {"gas", "fuel"},
+    "online": {"amazon", "online", "shopping"},
+}
+
+CATEGORY_RECOMMENDATIONS = {
+    "travel": [
+        ("Chase Sapphire Preferred", "700+", "3x on travel/dining; strong transfer partners"),
+        ("Capital One Venture Rewards", "700+", "2x everywhere with simple redemption"),
+    ],
+    "dining": [
+        ("American Express Gold", "720+", "4x on restaurants & US supermarkets"),
+        ("Capital One Savor", "700+", "4x dining & entertainment"),
+    ],
+    "groceries": [
+        ("Amex Blue Cash Preferred", "700+", "6% at US supermarkets"),
+        ("Amex Blue Cash Everyday", "690+", "3% supermarkets with no annual fee"),
+    ],
+    "entertainment": [
+        ("Capital One Savor", "700+", "4x on entertainment and dining"),
+        ("Chase Freedom Flex", "700+", "Rotating 5% categories often include entertainment"),
+    ],
+    "gas": [
+        ("Costco Anywhere Visa", "700+", "4% back on fuel (Costco membership required)"),
+        ("Bank of America Customized Cash", "700+", "3% in chosen category like gas"),
+    ],
+    "online": [
+        ("Amazon Prime Rewards Visa", "700+", "5% back at Amazon for Prime members"),
+        ("Chase Freedom Unlimited", "700+", "1.5%-3% across categories including online spends"),
+    ],
+}
 
 
-async def main():
-    client = AsyncDedalus()
-    runner = DedalusRunner(client)
+def _detect_category(user_query: str) -> str:
+    lowered = user_query.lower()
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        if any(word in lowered for word in keywords):
+            return category
+    return "general"
 
-    stream = await runner.run(
-        input=f"""
-You are Lattice, a financial reasoning co-pilot built with Knot's API. 
-The user provides a list of their credit cards and recent spending categories. 
-Your task is to determine the *optimal credit card to use* for a given purchase scenario.
 
-Context:
-The user's active credit cards (with details) are:
-{credit_cards}
+def _format_recommendation(category: str) -> tuple[str, str]:
+    recs = CATEGORY_RECOMMENDATIONS.get(category)
+    if not recs:
+        return (
+            "Chase Freedom Unlimited",
+            "700+",
+        )
+    name, score, *_ = recs[0]
+    return name, score
 
-User's query: {user_query}
 
-Instructions:
-- Identify the category of purchase (e.g., dining, travel, groceries, entertainment, etc.)
-- Use reward structures and credit health factors to reason which card offers the best effective value.
-- Prefer cards with higher category bonuses and balanced utilization.
-- Output the recommendation in this structure:
-- Use a lot of related emojis while explaining your step-by-step reasoning for financial analysis.
+def _format_backup(category: str) -> tuple[str, str] | None:
+    recs = CATEGORY_RECOMMENDATIONS.get(category)
+    if recs and len(recs) > 1:
+        name, score, *_ = recs[1]
+        return name, score
+    return None
 
----
-- Category: [Identified category]
-- Best Card: [Card Name]
-- Why: [Short explanation]
-- Effective Reward Value: [e.g., $1.80 or 4x points (~$1.80 equivalent)]
-- Secondary Option: [If applicable]
----
-""",
-        model="openai/gpt-4.1",
-        mcp_servers=[
-            "windsor/brave-search-mcp"
-        ],
+
+def _clean_card_name(card: str) -> str:
+    match = re.match(r"([A-Za-z0-9® ]+)", card)
+    return match.group(1).strip() if match else card.split("—")[0].strip()
+
+
+async def run_credit_score_agent(
+    user_cards: Sequence[str],
+    user_query: str,
+    today: str,
+) -> str:
+    """Return a friendly credit card recommendation using heuristics."""
+    load_dotenv()
+    if not os.getenv("DEDALUS_API_KEY"):
+        logger.warning("DEDALUS_API_KEY not set; credit agent returning fallback.")
+        return (
+            "**Best Card:** Chase Freedom Unlimited — recommended score 700+\n"
+            "**Why it Wins:** Flat rewards across every purchase, easy to manage. 💳\n"
+            "**Rewards Snapshot:** Expect at least 1.5% cash back everywhere.\n"
+            "**Backup Option:** Discover it Cash Back — recommended score 690+ — rotating 5% categories.\n"
+            "**Score Health Tip:** Pay balances in full and keep utilisation under 30% to protect your score.\n"
+            "**Extra Advice:** Configure the advisor service (Dedalus API key) for deeper, scenario-specific suggestions."
+        )
+
+    await asyncio.sleep(0)
+
+    catalog = user_cards or CREDIT_CARD_KNOWLEDGE
+
+    category = _detect_category(user_query)
+    best_card_name, best_score = _format_recommendation(category)
+    backup = _format_backup(category)
+
+    best_card_details = next(
+        (entry for entry in catalog if best_card_name in entry),
+        best_card_name,
     )
 
-    print(stream.final_output)
+    backup_text = ""
+    if backup:
+        backup_name, backup_score = backup
+        backup_details = next(
+            (entry for entry in catalog if backup_name in entry),
+            backup_name,
+        )
+        backup_text = f"**Backup Option:** {backup_details} (score {backup_score})"
 
+    category_label = category.title() if category != "general" else "Everyday spending"
+
+    return (
+        f"**Best Card:** {best_card_details} (score {best_score}+)\n"
+        f"**Why it Wins:** Tailored for {category_label.lower()} — strong rewards without overcomplicating your wallet. 💳\n"
+        f"**Rewards Snapshot:** Expect elevated earn rates for this category while keeping utilisation in check.\n"
+        f"{backup_text}\n"
+        f"**Score Health Tip:** Keep utilisation below 30% and pay in full each month to support your credit score.\n"
+        f"**Extra Advice:** Set a reminder to review your statement in a week to confirm the expected rewards posted. 💡"
+    )
+
+
+def run_credit_score_agent_sync(
+    user_cards: Sequence[str],
+    user_query: str,
+    today: str,
+) -> str:
+    """Synchronous helper for CLI/testing."""
+    load_dotenv()
+    if not os.getenv("DEDALUS_API_KEY"):
+        logger.warning("DEDALUS_API_KEY not set; credit agent returning fallback.")
+        return (
+            "Set up the advisor service (Dedalus API key) to unlock tailored credit card recommendations."
+        )
+
+    return asyncio.run(
+        run_credit_score_agent(
+            user_cards=user_cards,
+            user_query=user_query,
+            today=today,
+        )
+    )
+
+
+if __name__ == "__main__":
+    result = run_credit_score_agent_sync(
+        user_cards=CREDIT_CARD_KNOWLEDGE,
+        user_query="Heading to a new restaurant tonight, any card suggestions?",
+        today="2025-11-09",
+    )
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())

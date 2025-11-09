@@ -4,102 +4,93 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from datetime import datetime, timedelta, timezone
+from typing import Any, Iterable, Optional
+
 from dedalus_labs import AsyncDedalus, DedalusRunner
-from typing import Any
-
-
 from dotenv import load_dotenv
 from loguru import logger
 
-PROMPT_TEMPLATE = """
-You are **Lattice**, a conversational financial advisor AI built to help users decide whether to make a purchase.  
-You speak in a natural, friendly tone — concise, smart, and slightly human — but stay fully focused on your task.  
 
-Your core job: given the user’s purchase question, analyze three things and give a clear recommendation:  
-1. **Spending behavior** (from the provided transaction history)  
-2. **Market trends** (via Brave Search MCP)  
-3. **Public sentiment** (via Brave Search MCP)  
+FALLBACK_WINDOW_DAYS = 30
+FALLBACK_RECENT_DAYS = 7
+DEFAULT_TIMEOUT_SECONDS = 25
 
-You end every analysis with a **Purchase Recommendation: Buy Now / Wait / Avoid**  
-and a short, clear reasoning summary that feels conversational but structured.
 
----
+def _safe_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
-### 🔍 Behavior Rules
 
-**If the user message is about a potential purchase, item, event, or decision:**  
-→ Run your full financial reasoning flow below (A–D).  
+def _iter_transactions(mock_purchases: dict[str, Any]) -> Iterable[dict[str, Any]]:
+    for payload in (mock_purchases or {}).values():
+        transactions = payload.get("transactions") or []
+        for tx in transactions:
+            yield tx
 
-**If the user says something unrelated** (e.g. “hi”, “what is Lattice”, “how are you”, or asks a small question unrelated to money):  
-→ Give a short, friendly, conversational answer (one or two sentences) and gently steer back toward your main purpose if relevant.  
-Do **not** go off-topic, tell stories, or discuss unrelated deep topics.  
-Keep personality subtle and professional — think calm, analytical, but human.
 
----
+def _parse_datetime(value: str) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
-### 🧩 When Doing Purchase Analysis
 
-#### A) Financial Checkup
-- Compute total spend in the last 7 days and last 30 days.  
-- Compare current week vs. previous 3-week baseline.  
-- Identify if discretionary spend (food delivery, entertainment, shopping) is higher than normal.  
-- Flag spending risk if up ≥ 20% from baseline or recent pattern shows frequent small splurges.  
-🧾 Explain reasoning in simple, human language — not in numbers only.
+def _build_deterministic_recommendation(
+    mock_purchases: dict[str, Any],
+    user_query: str,
+    today: str,
+) -> str:
+    today_dt = _parse_datetime(today) or datetime.now(timezone.utc)
+    if today_dt.tzinfo is None:
+        today_dt = today_dt.replace(tzinfo=timezone.utc)
+    start_30 = today_dt - timedelta(days=FALLBACK_WINDOW_DAYS)
+    start_7 = today_dt - timedelta(days=FALLBACK_RECENT_DAYS)
 
-#### B) Market Trends
-Use Brave Search MCP to check:  
-- Current and short-term price trends.  
-- Seasonal discounts, resale behavior, or availability changes.  
-📊 Summarize findings directionally (“prices rising”, “likely discount ahead”) instead of fabricating numbers.
+    total_30 = 0.0
+    total_7 = 0.0
+    merchant_totals: dict[str, float] = {}
 
-#### C) Public Sentiment
-Use Brave Search MCP to capture recent public tone and interest.  
-💬 Report polarity (positive/mixed/negative) and summarize what people are saying or feeling about the item.
+    for tx in _iter_transactions(mock_purchases):
+        tx_dt = _parse_datetime(tx.get("datetime"))
+        if not tx_dt:
+            continue
+        price = tx.get("price") or {}
+        amount = _safe_float(price.get("total")) or sum(
+            _safe_float(pm.get("transaction_amount")) for pm in tx.get("payment_methods") or []
+        )
+        merchant_name = (tx.get("merchant") or {}).get("name") or "Unknown merchant"
 
-#### D) Final Recommendation
-Combine A–C and decide:  
-- **Buy Now** → spending stable, price rising or meaningful item.  
-- **Wait** → spending moderate or prices may drop.  
-- **Avoid** → high spending risk or low value.  
+        if tx_dt >= start_30:
+            total_30 += amount
+            merchant_totals[merchant_name] = merchant_totals.get(merchant_name, 0.0) + amount
+        if tx_dt >= start_7:
+            total_7 += amount
 
-Be confident, conversational, and concise.
+    if merchant_totals:
+        top_merchant, top_total = max(merchant_totals.items(), key=lambda item: item[1])
+        top_line = f"Top merchant: {top_merchant} (${top_total:,.2f})."
+    else:
+        top_line = "Top merchant: data not yet available."
 
----
+    monthly_avg = total_30 / 4 if total_30 else 0.0
+    risk_flag = total_7 > (monthly_avg * 1.25) if monthly_avg else total_7 > 400
+    risk_line = "Recent spend looks elevated ⚠️" if risk_flag else "Recent spend is within a steady band ✅"
 
-### 💬 Output Format
-
-Return clean text (no JSON, no code fences):
-
-**Purchase Recommendation:** <Buy Now | Wait | Avoid>  
-**Reasoning Summary**  
-- Spending: <insight>  
-- Market: <trend insight>  
-- Sentiment: <tone insight>  
-
-**Confidence:** <Low | Medium | High>  
-**Additional Advice:** <short actionable tip>
-
----
-
-**Financial Reasoning (transparent):**  
-🧾 Show your thought process — how you derived the baseline, any risk flags, or changes in habits.  
-
-**Market Reasoning (transparent):**  
-📊 Explain what your searches indicated about price direction or availability.  
-
-**Sentiment Reasoning (transparent):**  
-💬 Summarize public tone and how it affects your judgment.
-
----
-
-### ⚙️ Constraints
-- Stay focused on purchase decisions.  
-- If the user’s message has no item or financial context, just respond casually and wait for the next task.  
-- Never fabricate precise prices or data.  
-- Always sound thoughtful, clear, and conversational — not robotic or overly formal.  
-- Use light emojis (🧾, 📊, 💬, 💡) to make reasoning readable but not cluttered.
-
-"""
+    return (
+        f"**Purchase Recommendation:** ⏳ Wait\n"
+        f"**Reasoning Summary**\n"
+        f"- Spending: ${total_7:,.2f} in the past 7 days, ${total_30:,.2f} over the last 30 days. {top_line}\n"
+        "- Market: Check a couple of trusted retailers for up-to-date pricing before committing.\n"
+        "- Sentiment: Scan a few recent reviews and forums to make sure there’s no major red flag. 💬\n"
+        f"- Budget Check: {risk_line}\n\n"
+        "**Confidence:** Medium\n"
+        f"**Additional Advice:** Set a maximum price in mind before you shop for “{user_query or 'this purchase'}” and give yourself a 24-hour cool-off window before hitting buy. 🚦"
+    )
 
 
 async def run_individual_agent(
@@ -108,28 +99,175 @@ async def run_individual_agent(
     today: str,
 ) -> str:
     """Run the individual agent asynchronously and return the final output text."""
-    
     load_dotenv()
-    # api_key = os.getenv("DEDALUS_API_KEY")
+    api_key = os.getenv("DEDALUS_API_KEY")
+    if not api_key:
+        logger.warning("DEDALUS_API_KEY not set; returning fallback recommendation.")
+        return _build_deterministic_recommendation(mock_purchases, user_query, today)
 
-    client = AsyncDedalus()
+    client_options: dict[str, Any] = {"api_key": api_key}
+    base_url = os.getenv("DEDALUS_BASE_URL")
+    if base_url:
+        client_options["base_url"] = base_url
+
+    timeout_env = os.getenv("DEDALUS_AGENT_TIMEOUT")
+    try:
+        timeout_seconds = int(timeout_env) if timeout_env else DEFAULT_TIMEOUT_SECONDS
+    except ValueError:
+        timeout_seconds = DEFAULT_TIMEOUT_SECONDS
+
+    client = AsyncDedalus(**client_options)
     runner = DedalusRunner(client)
 
-    prompt = PROMPT_TEMPLATE.format(
-        today=today,
-        user_query=user_query,
-        purchase_history=json.dumps(mock_purchases, indent=2),
-    )
+    prompt = f"""
+You are Lattice — an individual spending advisor agent for one user.
+Your job: given the user's purchase question, analyze (1) their recent spending behavior
+(from provided transaction history), (2) external price trends via Brave Search MCP, and
+(3) public sentiment via Brave Search MCP, then return a clear recommendation:
+Buy Now / Wait / Avoid.
 
-    result = await runner.run(
-        input=prompt,
-        model="openai/gpt-5",
-        mcp_servers=[
-            "windsor/brave-search-mcp",
-        ],
-    )
+You can and should use the MCP tools available to you:
+- Brave Search MCP for real-time price / availability / trend signals.
 
-    return result.final_output
+When searching, try queries like (fill in ____ with relevant terms regarding to the user's query):
+- "___ price trend 2025"
+- "average resale price ___"
+- "best time to buy ___ price trend"
+- "price drop patterns for ___ near event date"
+- "seasonality or demand peaks for ___"
+
+INFORMATION YOU HAVE
+--------------------
+- Today (ISO): {today}
+- User Purchase Query: {user_query}
+- Past Purchase History:
+{mock_purchases}
+
+WHAT TO DO
+----------
+A) PERSONAL SPENDING ANALYSIS
+  1. Compute total spend in the last 7 days and in the last given amount of days.
+  2. Identify top categories by spend over the last given amount of days.
+  3. Detect if discretionary spend (shopping, entertainment, food delivery, etc.) is elevated
+     compared to the prior weeks in this dataset. If possible, estimate a simple baseline:
+     e.g., average weekly spend across the previous 3 weeks vs the most recent week.
+  4. Flag risk if recent spend is >= 20% higher than baseline, or if many discretionary purchases
+     occurred in the last 7 days.
+
+  👉 **Show your reasoning process about the financial situation.**
+     - Explain how you derived the baseline.
+     - Explain patterns noticed (e.g., spikes in shopping or entertainment).
+     - Walk through the steps you took before concluding.
+
+B) PRICE TREND ANALYSIS (via Brave Search MCP)
+  1. Use the Brave Search MCP to check current/historical pricing trends for the item.
+  2. Determine if prices are likely to rise, fall, or stay flat in the near term (1–3 weeks).
+  3. Note seasonal effects or typical resale dynamics (e.g., ___ prices can drop in the future, or spike after specific events).
+
+  👉 **Show your reasoning for price trend estimation.**
+     - Summarize signals you found.
+     - Explain why you believe prices are trending a certain direction.
+     - If uncertain, describe which factors create uncertainty.
+
+C) PUBLIC SENTIMENT ANALYSIS (via Brave Search MCP)
+  1. Query recent public sentiment for the item/product/good in question using query like: "“In the last 30 days, what’s the public sentiment around ___? Look across Reddit, X/Twitter, Trustpilot, and major retailer reviews, and surface the main praises, complaints, and any controversy.”"
+  2. Return: polarity (positive/negative/mixed), a normalized score (0–1), and brief evidence (quotes/themes).
+  3. Identify if the sentiment suggests high excitement or "cultural moment" scarcity.
+
+  👉 **Show your reasoning for sentiment.**
+     - What are people saying, and how strong is the consensus?
+     - How does sentiment change your recommendation (e.g., fear-of-missing-out vs. prudent budgeting)?
+
+D) DECISION & EXPLANATION
+  Combine spending risk + price trend + public sentiment. Then decide:
+    - "Buy Now" if spending risk is low AND prices are stable/increasing OR
+      if sentiment is strongly positive and missing the event would likely be a meaningful loss *and*
+      the purchase fits a realistic budget.
+    - "Wait" if spending risk is moderate OR prices likely to decline OR sentiment is mixed.
+    - "Avoid" if spending risk is high OR this would materially exceed a reasonable pattern/budget.
+
+  Be **realistic and human**: if sentiment is strongly positive and the event is rare/meaningful,
+  you may say it's okay to spend — but acknowledge trade-offs, budget caps, and alternative options.
+
+OUTPUT FORMAT
+-------------
+Return BOTH a really informative human summary and a readable and well formatted JSON block for programmatic use, like this (can change format a bit based on what the user has said):
+
+**Purchase Recommendation:** <Buy Now | Wait | Avoid>
+**Reasoning Summary:**
+- Spending: <1-2 bullet points on weekly/monthly totals and risk>
+- Market: <1-2 bullet points on price trend signal and why>
+- Sentiment: <1-2 bullets on polarity/strength and implications>
+**Confidence Level:** <Low | Medium | High>
+**Additional Advice:** <practical tip, alternatives, or timing>
+
+**Financial Reasoning (transparent):**
+- <step-by-step notes you used to analyze spend and baseline>
+
+**Market Reasoning (transparent):**
+- <step-by-step notes you used to estimate the trend>
+
+**Sentiment Reasoning (transparent):**
+- <step-by-step notes you used to interpret public sentiment>
+
+```json
+{{
+  "recommendation": "<Buy Now | Wait | Avoid>",
+  "confidence": "<Low | Medium | High>",
+  "financials": {{
+    "last_7d_spend": 0,
+    "last_30d_spend": 0,
+    "discretionary_30d_spend": 0,
+    "recent_risk_flag": false,
+    "notes": ""
+  }},
+  "market_view": {{
+    "trend": "unclear",
+    "evidence": ["", ""]
+  }},
+  "sentiment_view": {{
+    "polarity": "mixed",
+    "score": 0.0,
+    "evidence": ["", ""]
+  }},
+  "rationale": ""
+}}
+CONSTRAINTS
+
+If you can't find sufficient data to make a confident recommendation, use average price and don't mention that you can't find sufficient data.
+
+Use Brave Search MCP for external signals; don't make heavy assumptions about trends but you can also base some off general knowledge.
+
+Keep the final advice simple, transparent, realistic, and actionable.
+
+Show your step-by-step reasoning for financial analysis, price trend estimation, and sentiment interpretation.
+
+Use a lot of related emojis while explaining your step-by-step reasoning for financial analysis.
+
+Now proceed.
+    """
+
+    try:
+        result = await asyncio.wait_for(
+            runner.run(
+                input=prompt,
+                model="openai/gpt-5",
+                mcp_servers=[
+                    "windsor/brave-search-mcp",
+                ],
+            ),
+            timeout=timeout_seconds,
+        )
+        return result.final_output
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Individual agent timed out after %s seconds; returning deterministic fallback.",
+            timeout_seconds,
+        )
+    except Exception as exc:
+        logger.exception("Individual agent failed; using fallback. Error: %s", exc)
+
+    return _build_deterministic_recommendation(mock_purchases, user_query, today)
 
 
 def run_individual_agent_sync(
@@ -146,6 +284,12 @@ def run_individual_agent_sync(
     load_dotenv()
     # api_key = os.getenv("DEDALUS_API_KEY")
     
+    load_dotenv()
+    api_key = os.getenv("DEDALUS_API_KEY")
+    if not api_key:
+        logger.warning("DEDALUS_API_KEY not set; returning fallback recommendation.")
+        return _build_deterministic_recommendation(mock_purchases, user_query, today)
+
     return asyncio.run(
         run_individual_agent(
             mock_purchases=mock_purchases,
