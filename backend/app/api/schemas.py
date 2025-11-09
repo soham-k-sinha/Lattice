@@ -72,6 +72,12 @@ class MessageResponse(BaseModel):
     created_at: datetime
 
 
+class MessageSendResponse(BaseModel):
+    """Response returned when sending a chat message."""
+    user_message: MessageResponse
+    ai_message: Optional[MessageResponse] = None
+
+
 # ============= Group Schemas =============
 
 class GroupCreate(BaseModel):

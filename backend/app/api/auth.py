@@ -88,17 +88,17 @@ def login(user_data: UserLogin) -> Token:
             password=user_data.password,
         )
         if stored_user:
-            access_token = create_access_token(
-                data={
+                access_token = create_access_token(
+                    data={
                     "user_id": stored_user["id"],
                     "email": stored_user["email"],
                     "name": stored_user["name"],
                     "onboarding_status": stored_user["onboarding_status"],
-                },
-                expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
-            )
-            return Token(access_token=access_token)
-
+                    },
+                    expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+                )
+                return Token(access_token=access_token)
+        
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

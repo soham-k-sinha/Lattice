@@ -1,12 +1,12 @@
 {
-  "synced_at": "2025-11-09T05:28:32.763344",
+  "synced_at": "2025-11-09T08:51:05.731871",
   "merchant": {
     "id": 36,
     "name": "Uber Eats"
   },
   "transactions": [
     {
-      "id": "e8616f86-36f3-46a0-b008-462ba33032c0",
+      "id": "a35ffa42-1bec-4abf-a253-d2ba5b5b57f4",
       "merchant_id": null,
       "external_id": "63eec3a4-68b8-4274-b248-b8381ef85bf7",
       "datetime": "2025-10-26T01:26:18+00:00",
@@ -113,10 +113,133 @@
         }
       ],
       "metadata": {},
-      "merchant_name": "Uber Eats"
+      "merchant_name": "Uber Eats",
+      "price_currency": "USD",
+      "order_id": null,
+      "transaction_status": "PICKED_UP"
     }
   ],
   "next_cursor": null,
   "has_more": null,
-  "limit": 100
+  "limit": 100,
+  "raw_response": {
+    "merchant": {
+      "id": 36,
+      "name": "Uber Eats"
+    },
+    "transactions": [
+      {
+        "id": "a35ffa42-1bec-4abf-a253-d2ba5b5b57f4",
+        "merchant_id": null,
+        "external_id": "63eec3a4-68b8-4274-b248-b8381ef85bf7",
+        "datetime": "2025-10-26T01:26:18+00:00",
+        "url": "https://www.ubereats.com/orders/63eec3a4-68b8-4274-b248-b8381ef85bf7",
+        "order_status": "PICKED_UP",
+        "payment_methods": [
+          {
+            "external_id": null,
+            "type": "GIFT_CARD",
+            "brand": null,
+            "last_four": null,
+            "name": null,
+            "transaction_amount": "15.00"
+          },
+          {
+            "external_id": null,
+            "type": "APPLE_PAY",
+            "brand": "VISA",
+            "last_four": null,
+            "name": null,
+            "transaction_amount": "7.94"
+          }
+        ],
+        "price": {
+          "sub_total": "21.16",
+          "adjustments": [
+            {
+              "type": "FEE",
+              "label": "Delivery Fee",
+              "amount": "1.99"
+            },
+            {
+              "type": "FEE",
+              "label": "Marketplace Fee",
+              "amount": "2.54"
+            },
+            {
+              "type": "TAX",
+              "label": "Tax",
+              "amount": "0.93"
+            },
+            {
+              "type": "TIP",
+              "label": "Tip",
+              "amount": "2.00"
+            },
+            {
+              "type": "DISCOUNT",
+              "label": "Special Offers",
+              "amount": "-5.68"
+            }
+          ],
+          "total": "22.94",
+          "currency": "USD"
+        },
+        "products": [
+          {
+            "external_id": "7d2231eb-4eca-4244-8f7a-6493281fbc21",
+            "name": "Pacific Veggie",
+            "url": "https://www.ubereats.com/store-browse-uuid/6837a88f-ce67-5fd6-b0df-62314470bf82/5266c280-a5fd-5c9c-b5f2-035b9a907e51/ca8b5c3c-2936-5ceb-8c3e-239aabfa0bf6/45d052d9-bdcb-59d3-a6df-1ac34bdfb222?storeInfoHeader=true",
+            "quantity": 1,
+            "eligibility": [],
+            "price": {
+              "sub_total": null,
+              "total": "14.19",
+              "unit_price": "14.19"
+            }
+          },
+          {
+            "external_id": "e0109086-5070-4699-bca0-39ef5d909504",
+            "name": "Parmesan Bread Bites",
+            "url": "https://www.ubereats.com/store-browse-uuid/6837a88f-ce67-5fd6-b0df-62314470bf82/5266c280-a5fd-5c9c-b5f2-035b9a907e51/a1a35e5e-9059-568d-b4ea-7628d10296b5/4abca1b4-1bc5-5046-8792-6b2eb14b5a17?storeInfoHeader=true",
+            "quantity": 1,
+            "eligibility": [],
+            "price": {
+              "sub_total": null,
+              "total": "5.39",
+              "unit_price": "5.39"
+            }
+          },
+          {
+            "external_id": "ad49292c-aca6-4110-baf3-8a209eb50888",
+            "name": "Garlic Dipping Cup",
+            "url": "https://www.ubereats.com/store-browse-uuid/6837a88f-ce67-5fd6-b0df-62314470bf82/5266c280-a5fd-5c9c-b5f2-035b9a907e51/840f8e78-53c6-5643-af10-ec53c6c0175b/49b015ec-470e-5cae-af63-491a6538e40e?storeInfoHeader=true",
+            "quantity": 1,
+            "eligibility": [],
+            "price": {
+              "sub_total": null,
+              "total": "0.79",
+              "unit_price": "0.79"
+            }
+          },
+          {
+            "external_id": "51fc58f3-31bc-4559-84c0-3c29f10e55a4",
+            "name": "Marinara Dipping Cup",
+            "url": "https://www.ubereats.com/store-browse-uuid/6837a88f-ce67-5fd6-b0df-62314470bf82/5266c280-a5fd-5c9c-b5f2-035b9a907e51/840f8e78-53c6-5643-af10-ec53c6c0175b/ab20f412-ab85-5844-b31d-46037de934ed?storeInfoHeader=true",
+            "quantity": 1,
+            "eligibility": [],
+            "price": {
+              "sub_total": null,
+              "total": "0.79",
+              "unit_price": "0.79"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "next_cursor": null,
+    "has_more": null,
+    "limit": 100
+  }
 }

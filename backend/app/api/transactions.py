@@ -53,10 +53,34 @@ async def sync_transactions(
     try:
         # First, get user's linked accounts
         external_user_id = KNOT_EXTERNAL_IDS.get(current_user.id, str(current_user.id))
-        logger.info(
-            f"Fetching accounts for user {current_user.id} (external_id={external_user_id})"
-        )
-        accounts = await knot.get_accounts(external_user_id)
+        try:
+            accounts = await knot.get_accounts(external_user_id)
+        except KnotAPIError as account_err:
+            logger.warning(
+                "Failed to fetch accounts for user %s (external_user_id=%s): %s",
+                current_user.id,
+                external_user_id,
+                account_err,
+            )
+            # Fallback to stored in-memory onboarding accounts if available
+            from app.api.onboarding import KNOT_LINKED_ACCOUNTS
+
+            stored_accounts = KNOT_LINKED_ACCOUNTS.get(current_user.id)
+            if stored_accounts:
+                accounts = [
+                    KnotAccount(
+                        id=str(acc["knot_account_id"] or acc["id"]),
+                        merchant_id=str(acc["knot_merchant_id"]),
+                        merchant_name=str(acc["institution"]),
+                        status=str(acc.get("status", "active")),
+                        permissions=acc.get("permissions") or {},
+                        linked_at=acc.get("last_synced"),
+                    )
+                    for acc in stored_accounts
+                    if acc.get("knot_merchant_id")
+                ]
+            else:
+                raise
         
         if not accounts:
             return {
@@ -71,18 +95,23 @@ async def sync_transactions(
         # Determine merchant to sync
         selected_account = None
         if merchant_id:
-            merchant_id_str = str(merchant_id)
+            merchant_id_str = str(merchant_id).lower()
             for acc in accounts:
-                if str(acc.merchant_id) == merchant_id_str:
+                acc_id = str(acc.id).lower()
+                acc_merchant_id = str(acc.merchant_id).lower()
+                acc_name = acc.merchant_name.lower()
+                if (
+                    merchant_id_str in {acc_id, acc_merchant_id, acc_name}
+                    or merchant_id_str == acc_name.replace(" ", "")
+                ):
                     selected_account = acc
                     break
             if not selected_account:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Merchant {merchant_id} not linked for this user"
+                    detail=f"Merchant {merchant_id} not linked for this user",
                 )
         else:
-            # Default to the first linked merchant
             selected_account = accounts[0]
             logger.info(
                 "No merchant_id provided, defaulting to merchant %s (%s)",
@@ -99,6 +128,7 @@ async def sync_transactions(
         sync_response = await knot.sync_transactions(
             external_user_id=external_user_id,
             merchant_id=str(selected_account.merchant_id),
+            account_id=str(selected_account.id),
             cursor=cursor,
             limit=limit,
         )
@@ -106,9 +136,22 @@ async def sync_transactions(
         transactions_payload = []
         for txn in sync_response.transactions:
             txn_payload = txn.model_dump() if hasattr(txn, "model_dump") else dict(txn)
-            # Ensure merchant metadata is populated
             txn_payload.setdefault("merchant_id", selected_account.merchant_id)
             txn_payload.setdefault("merchant_name", selected_account.merchant_name)
+            price = txn_payload.get("price")
+            if isinstance(price, dict):
+                amount = price.get("amount")
+                if amount and isinstance(amount, (int, float, str)):
+                    try:
+                        txn_payload["price_amount"] = float(amount)
+                    except ValueError:
+                        logger.debug("Unable to parse price amount %s", amount)
+                txn_payload["price_currency"] = price.get("currency")
+            metadata = txn_payload.get("metadata") or {}
+            txn_payload["order_id"] = metadata.get("order_id") or metadata.get("external_id")
+            txn_payload["transaction_status"] = (
+                txn_payload.get("order_status") or metadata.get("status")
+            )
             transactions_payload.append(txn_payload)
         
         merchant_payload = sync_response.merchant or {
@@ -132,6 +175,7 @@ async def sync_transactions(
             "limit": sync_response.limit or limit,
             "synced_at": datetime.utcnow().isoformat(),
             "merchant": merchant_payload,
+            "raw_response": sync_response.model_dump(),
         }
         file_path = _dump_transactions_to_file(
             current_user.id,
@@ -143,6 +187,7 @@ async def sync_transactions(
                 "next_cursor": sync_response.next_cursor,
                 "has_more": sync_response.has_more,
                 "limit": sync_response.limit or limit,
+                "raw_response": sync_response.model_dump(),
             },
         )
         
@@ -157,6 +202,7 @@ async def sync_transactions(
             "cursor": sync_response.next_cursor,
             "synced_at": user_cache[merchant_id_str]["synced_at"],
             "file_path": str(file_path),
+            "raw_response": sync_response.model_dump(),
         }
         
     except KnotAPIError as e:

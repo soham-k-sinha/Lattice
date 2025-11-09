@@ -284,6 +284,7 @@ class KnotClient:
         self,
         external_user_id: str,
         merchant_id: str,
+        account_id: Optional[str] = None,
         cursor: Optional[str] = None,
         limit: int = 100,
     ) -> KnotTransactionSyncResponse:
@@ -304,11 +305,16 @@ class KnotClient:
             "merchant_id": merchant_id,
             "limit": limit,
         }
+        if account_id:
+            payload["merchant_account_id"] = account_id
+            payload["account_id"] = account_id
         
         if cursor:
             payload["cursor"] = cursor
         
-        logger.info(f"Syncing transactions for {merchant_id}, user {external_user_id}")
+        logger.info(
+            f"Syncing transactions for user {external_user_id} merchant {merchant_id} account {account_id}"
+        )
         result = await self._request("POST", "/transactions/sync", json=payload)
         return KnotTransactionSyncResponse(**result)
     

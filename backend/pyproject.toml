@@ -23,6 +23,7 @@ passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 python-multipart = "^0.0.6"
 loguru = "^0.7.2"
 apscheduler = "^3.10.4"
+dedalus-labs = "^0.0.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.12.0"
