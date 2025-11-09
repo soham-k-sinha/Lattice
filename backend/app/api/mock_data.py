@@ -49,76 +49,9 @@ MOCK_CHATS = [
 
 # Mock messages data
 MOCK_MESSAGES = {
-    1: [
-        {
-            "id": 1,
-            "chat_id": 1,
-            "sender_id": 1,
-            "sender_type": "user",
-            "content": "What's the best credit card for groceries?",
-            "thinking": [],
-            "action": None,
-            "drawer_data": None,
-            "created_at": (datetime.utcnow() - timedelta(hours=2)).isoformat(),
-        },
-        {
-            "id": 2,
-            "chat_id": 1,
-            "sender_id": None,
-            "sender_type": "ai",
-            "content": "Based on your spending patterns, I recommend the Blue Cash Preferred® Card for 6% cash back on groceries at U.S. supermarkets (up to $6,000 per year, then 1%).",
-            "thinking": [
-                "Analyzing your grocery spending history",
-                "Comparing cash back rates across cards",
-                "Calculating potential annual savings",
-            ],
-            "action": "card",
-            "drawer_data": {
-                "recommendation": "Blue Cash Preferred® Card",
-                "cash_back_rate": "6%",
-                "category": "groceries",
-                "annual_fee": "$95",
-                "estimated_savings": "$360/year",
-            },
-            "created_at": (datetime.utcnow() - timedelta(hours=2, minutes=1)).isoformat(),
-        },
-    ],
-    2: [
-        {
-            "id": 3,
-            "chat_id": 2,
-            "sender_id": 1,
-            "sender_type": "user",
-            "content": "Split our Airbnb cost of $450 between 3 people",
-            "thinking": [],
-            "action": None,
-            "drawer_data": None,
-            "created_at": (datetime.utcnow() - timedelta(hours=5)).isoformat(),
-        },
-        {
-            "id": 4,
-            "chat_id": 2,
-            "sender_id": None,
-            "sender_type": "ai",
-            "content": "I've calculated the split: each person owes $150.",
-            "thinking": [
-                "Identifying 3 participants",
-                "Calculating equal split of $450",
-            ],
-            "action": "split",
-            "drawer_data": {
-                "total": 450,
-                "participants": ["Alice", "Bob", "Charlie"],
-                "split": {
-                    "Alice": 150,
-                    "Bob": 150,
-                    "Charlie": 150,
-                },
-                "transaction": "Airbnb Weekend Stay",
-            },
-            "created_at": (datetime.utcnow() - timedelta(hours=5, minutes=1)).isoformat(),
-        },
-    ],
+    1: [],
+    2: [],
+    3: [],
 }
 
 # Mock groups data

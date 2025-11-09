@@ -1,5 +1,5 @@
 {
-  "next_id": 8,
+  "next_id": 10,
   "users": [
     {
       "id": 1,
@@ -76,6 +76,26 @@
       "preferences": {},
       "created_at": "2025-11-09T12:20:38.065959",
       "updated_at": "2025-11-09T12:20:38.065959"
+    },
+    {
+      "id": 8,
+      "name": "b",
+      "email": "b@g.com",
+      "hashed_password": "$pbkdf2-sha256$29000$slaq1dobY.w959wbozRmjA$h0yVW6XSnkf/bUAIWXIAXiT3mAEZZ6U5TbdHLui0t7A",
+      "onboarding_status": "incomplete",
+      "preferences": {},
+      "created_at": "2025-11-09T12:57:57.718170",
+      "updated_at": "2025-11-09T12:57:57.718170"
+    },
+    {
+      "id": 9,
+      "name": "Apple",
+      "email": "apple@gmail.com",
+      "hashed_password": "$pbkdf2-sha256$29000$cE5p7b3XGiOkVKr1nnOOkQ$GvuersmXAZAWyLB4K.5KNN0pSDKrfCt9ozAuI1iUhy8",
+      "onboarding_status": "incomplete",
+      "preferences": {},
+      "created_at": "2025-11-09T13:15:59.260333",
+      "updated_at": "2025-11-09T13:15:59.260333"
     }
   ]
 }

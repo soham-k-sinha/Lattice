@@ -1,0 +1,352 @@
+{
+  "synced_at": "2025-11-09T13:18:11.793642",
+  "merchant": {
+    "id": 36,
+    "name": "Uber Eats"
+  },
+  "transactions": [
+    {
+      "id": "sample-ubereats-1",
+      "merchant_id": "36",
+      "merchant_name": "Uber Eats",
+      "external_id": "UB-20251107-001",
+      "datetime": "2025-11-07T13:18:11.793416+00:00",
+      "url": null,
+      "order_status": "DELIVERED",
+      "payment_methods": [
+        {
+          "type": "CARD",
+          "brand": "VISA",
+          "transaction_amount": "19.30",
+          "last_four": "4242"
+        }
+      ],
+      "price": {
+        "amount": "19.30",
+        "currency": "USD",
+        "sub_total": "14.20",
+        "tax": "1.11",
+        "tip": "2.50",
+        "adjustments": [
+          {
+            "type": "FEE",
+            "label": "Delivery Fee",
+            "amount": "1.49"
+          }
+        ]
+      },
+      "products": [
+        {
+          "name": "Harvest Bowl",
+          "quantity": 1,
+          "price": "11.95"
+        },
+        {
+          "name": "Sparkling Water",
+          "quantity": 1,
+          "price": "2.25"
+        }
+      ],
+      "metadata": {
+        "order_id": "UB-20251107-001",
+        "status": "DELIVERED",
+        "restaurant": "Green Bowl Salads",
+        "source": "sample"
+      },
+      "price_amount": 19.3,
+      "price_currency": "USD",
+      "order_id": "UB-20251107-001",
+      "transaction_status": "DELIVERED"
+    },
+    {
+      "id": "sample-ubereats-2",
+      "merchant_id": "36",
+      "merchant_name": "Uber Eats",
+      "external_id": "UB-20251102-002",
+      "datetime": "2025-11-02T13:18:11.793416+00:00",
+      "url": null,
+      "order_status": "DELIVERED",
+      "payment_methods": [
+        {
+          "type": "CARD",
+          "brand": "VISA",
+          "transaction_amount": "17.32",
+          "last_four": "4242"
+        }
+      ],
+      "price": {
+        "amount": "17.32",
+        "currency": "USD",
+        "sub_total": "13.25",
+        "tax": "1.08",
+        "tip": "2.00",
+        "adjustments": [
+          {
+            "type": "FEE",
+            "label": "Delivery Fee",
+            "amount": "0.99"
+          }
+        ]
+      },
+      "products": [
+        {
+          "name": "Breakfast Burrito",
+          "quantity": 1,
+          "price": "9.50"
+        },
+        {
+          "name": "Cold Brew",
+          "quantity": 1,
+          "price": "3.75"
+        }
+      ],
+      "metadata": {
+        "order_id": "UB-20251102-002",
+        "status": "DELIVERED",
+        "restaurant": "Sunrise Diner",
+        "source": "sample"
+      },
+      "price_amount": 17.32,
+      "price_currency": "USD",
+      "order_id": "UB-20251102-002",
+      "transaction_status": "DELIVERED"
+    },
+    {
+      "id": "sample-ubereats-3",
+      "merchant_id": "36",
+      "merchant_name": "Uber Eats",
+      "external_id": "UB-20251026-003",
+      "datetime": "2025-10-26T13:18:11.793416+00:00",
+      "url": null,
+      "order_status": "DELIVERED",
+      "payment_methods": [
+        {
+          "type": "CARD",
+          "brand": "VISA",
+          "transaction_amount": "25.48",
+          "last_four": "4242"
+        }
+      ],
+      "price": {
+        "amount": "25.48",
+        "currency": "USD",
+        "sub_total": "19.40",
+        "tax": "1.59",
+        "tip": "3.00",
+        "adjustments": [
+          {
+            "type": "FEE",
+            "label": "Delivery Fee",
+            "amount": "1.49"
+          }
+        ]
+      },
+      "products": [
+        {
+          "name": "Salmon Roll",
+          "quantity": 1,
+          "price": "8.95"
+        },
+        {
+          "name": "California Roll",
+          "quantity": 1,
+          "price": "7.95"
+        },
+        {
+          "name": "Miso Soup",
+          "quantity": 1,
+          "price": "2.50"
+        }
+      ],
+      "metadata": {
+        "order_id": "UB-20251026-003",
+        "status": "DELIVERED",
+        "restaurant": "Little Kyoto Sushi",
+        "source": "sample"
+      },
+      "price_amount": 25.48,
+      "price_currency": "USD",
+      "order_id": "UB-20251026-003",
+      "transaction_status": "DELIVERED"
+    }
+  ],
+  "next_cursor": null,
+  "has_more": null,
+  "limit": 100,
+  "raw_response": {
+    "merchant": {
+      "id": 36,
+      "name": "Uber Eats"
+    },
+    "transactions": [
+      {
+        "id": "sample-ubereats-1",
+        "merchant_id": "36",
+        "merchant_name": "Uber Eats",
+        "external_id": "UB-20251107-001",
+        "datetime": "2025-11-07T13:18:11.793416+00:00",
+        "url": null,
+        "order_status": "DELIVERED",
+        "payment_methods": [
+          {
+            "type": "CARD",
+            "brand": "VISA",
+            "transaction_amount": "19.30",
+            "last_four": "4242"
+          }
+        ],
+        "price": {
+          "amount": "19.30",
+          "currency": "USD",
+          "sub_total": "14.20",
+          "tax": "1.11",
+          "tip": "2.50",
+          "adjustments": [
+            {
+              "type": "FEE",
+              "label": "Delivery Fee",
+              "amount": "1.49"
+            }
+          ]
+        },
+        "products": [
+          {
+            "name": "Harvest Bowl",
+            "quantity": 1,
+            "price": "11.95"
+          },
+          {
+            "name": "Sparkling Water",
+            "quantity": 1,
+            "price": "2.25"
+          }
+        ],
+        "metadata": {
+          "order_id": "UB-20251107-001",
+          "status": "DELIVERED",
+          "restaurant": "Green Bowl Salads",
+          "source": "sample"
+        },
+        "price_amount": 19.3,
+        "price_currency": "USD",
+        "order_id": "UB-20251107-001",
+        "transaction_status": "DELIVERED"
+      },
+      {
+        "id": "sample-ubereats-2",
+        "merchant_id": "36",
+        "merchant_name": "Uber Eats",
+        "external_id": "UB-20251102-002",
+        "datetime": "2025-11-02T13:18:11.793416+00:00",
+        "url": null,
+        "order_status": "DELIVERED",
+        "payment_methods": [
+          {
+            "type": "CARD",
+            "brand": "VISA",
+            "transaction_amount": "17.32",
+            "last_four": "4242"
+          }
+        ],
+        "price": {
+          "amount": "17.32",
+          "currency": "USD",
+          "sub_total": "13.25",
+          "tax": "1.08",
+          "tip": "2.00",
+          "adjustments": [
+            {
+              "type": "FEE",
+              "label": "Delivery Fee",
+              "amount": "0.99"
+            }
+          ]
+        },
+        "products": [
+          {
+            "name": "Breakfast Burrito",
+            "quantity": 1,
+            "price": "9.50"
+          },
+          {
+            "name": "Cold Brew",
+            "quantity": 1,
+            "price": "3.75"
+          }
+        ],
+        "metadata": {
+          "order_id": "UB-20251102-002",
+          "status": "DELIVERED",
+          "restaurant": "Sunrise Diner",
+          "source": "sample"
+        },
+        "price_amount": 17.32,
+        "price_currency": "USD",
+        "order_id": "UB-20251102-002",
+        "transaction_status": "DELIVERED"
+      },
+      {
+        "id": "sample-ubereats-3",
+        "merchant_id": "36",
+        "merchant_name": "Uber Eats",
+        "external_id": "UB-20251026-003",
+        "datetime": "2025-10-26T13:18:11.793416+00:00",
+        "url": null,
+        "order_status": "DELIVERED",
+        "payment_methods": [
+          {
+            "type": "CARD",
+            "brand": "VISA",
+            "transaction_amount": "25.48",
+            "last_four": "4242"
+          }
+        ],
+        "price": {
+          "amount": "25.48",
+          "currency": "USD",
+          "sub_total": "19.40",
+          "tax": "1.59",
+          "tip": "3.00",
+          "adjustments": [
+            {
+              "type": "FEE",
+              "label": "Delivery Fee",
+              "amount": "1.49"
+            }
+          ]
+        },
+        "products": [
+          {
+            "name": "Salmon Roll",
+            "quantity": 1,
+            "price": "8.95"
+          },
+          {
+            "name": "California Roll",
+            "quantity": 1,
+            "price": "7.95"
+          },
+          {
+            "name": "Miso Soup",
+            "quantity": 1,
+            "price": "2.50"
+          }
+        ],
+        "metadata": {
+          "order_id": "UB-20251026-003",
+          "status": "DELIVERED",
+          "restaurant": "Little Kyoto Sushi",
+          "source": "sample"
+        },
+        "price_amount": 25.48,
+        "price_currency": "USD",
+        "order_id": "UB-20251026-003",
+        "transaction_status": "DELIVERED"
+      }
+    ],
+    "next_cursor": null,
+    "has_more": null,
+    "limit": 100,
+    "fallback": "sample_transactions"
+  }
+}

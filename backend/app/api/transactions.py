@@ -1,6 +1,6 @@
 """Transactions API routes - Fetch and sync transaction data from Knot"""
 from typing import Any, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import json
 
@@ -10,6 +10,7 @@ from loguru import logger
 from app.middleware.auth import get_current_user
 from app.models import User
 from app.integrations.knot import KnotClient, KnotAPIError
+from app.integrations.knot_types import KnotAccount
 from app.api.onboarding import KNOT_EXTERNAL_IDS
 
 router = APIRouter()
@@ -20,6 +21,57 @@ TRANSACTIONS_CACHE: dict[int, Dict[str, Dict[str, Any]]] = {}
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "transactions"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+SAMPLE_TRANSACTION_TEMPLATES: Dict[str, list[dict[str, Any]]] = {
+    "ubereats": [
+        {
+            "days_ago": 2,
+            "restaurant": "Green Bowl Salads",
+            "items": [
+                {"name": "Harvest Bowl", "quantity": 1, "price": 11.95},
+                {"name": "Sparkling Water", "quantity": 1, "price": 2.25},
+            ],
+            "subtotal": 14.20,
+            "tax": 1.11,
+            "tip": 2.50,
+            "delivery_fee": 1.49,
+            "status": "DELIVERED",
+        },
+        {
+            "days_ago": 7,
+            "restaurant": "Sunrise Diner",
+            "items": [
+                {"name": "Breakfast Burrito", "quantity": 1, "price": 9.50},
+                {"name": "Cold Brew", "quantity": 1, "price": 3.75},
+            ],
+            "subtotal": 13.25,
+            "tax": 1.08,
+            "tip": 2.00,
+            "delivery_fee": 0.99,
+            "status": "DELIVERED",
+        },
+        {
+            "days_ago": 14,
+            "restaurant": "Little Kyoto Sushi",
+            "items": [
+                {"name": "Salmon Roll", "quantity": 1, "price": 8.95},
+                {"name": "California Roll", "quantity": 1, "price": 7.95},
+                {"name": "Miso Soup", "quantity": 1, "price": 2.50},
+            ],
+            "subtotal": 19.40,
+            "tax": 1.59,
+            "tip": 3.00,
+            "delivery_fee": 1.49,
+            "status": "DELIVERED",
+        },
+    ],
+}
+
+SAMPLE_MERCHANT_ALIASES = {
+    "36": "ubereats",
+    "ubereats": "ubereats",
+    "uber eats": "ubereats",
+}
 
 
 def _dump_transactions_to_file(user_id: int, merchant_id: str, payload: Dict[str, Any]) -> Path:
@@ -32,6 +84,135 @@ def _dump_transactions_to_file(user_id: int, merchant_id: str, payload: Dict[str
     except Exception as dump_err:
         logger.error("Failed to write transactions file %s: %s", file_path, dump_err)
     return file_path
+
+
+def _normalize_transaction(
+    raw_txn: Any,
+    merchant_id: str,
+    merchant_name: str,
+) -> Dict[str, Any]:
+    txn_payload = raw_txn.model_dump() if hasattr(raw_txn, "model_dump") else dict(raw_txn)
+    txn_payload.setdefault("merchant_id", merchant_id)
+    txn_payload.setdefault("merchant_name", merchant_name)
+
+    price = txn_payload.get("price") or {}
+    if not isinstance(price, dict):
+        price = {}
+    txn_payload["price"] = price
+
+    amount_candidate = (
+        price.get("amount")
+        or price.get("total")
+        or price.get("final_total")
+        or price.get("sub_total")
+        or txn_payload.get("amount")
+    )
+    if amount_candidate is not None:
+        try:
+            txn_payload["price_amount"] = float(amount_candidate)
+        except (TypeError, ValueError):
+            pass
+
+    txn_payload["price_currency"] = price.get("currency", "USD")
+
+    metadata = txn_payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    txn_payload["metadata"] = metadata
+
+    txn_payload["order_id"] = (
+        metadata.get("order_id")
+        or metadata.get("external_id")
+        or txn_payload.get("external_id")
+        or txn_payload.get("id")
+    )
+    txn_payload["transaction_status"] = (
+        txn_payload.get("order_status")
+        or metadata.get("status")
+        or metadata.get("order_status")
+    )
+
+    return txn_payload
+
+
+def _build_sample_transactions(merchant_id: str, merchant_name: str) -> list[dict[str, Any]]:
+    candidates = [
+        merchant_id.lower(),
+        (merchant_name or "").lower(),
+        (merchant_name or "").lower().replace(" ", ""),
+    ]
+    template_key = None
+    for candidate in candidates:
+        alias = SAMPLE_MERCHANT_ALIASES.get(candidate, candidate)
+        if alias in SAMPLE_TRANSACTION_TEMPLATES:
+            template_key = alias
+            break
+
+    if not template_key:
+        return []
+
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    samples: list[dict[str, Any]] = []
+
+    for idx, template in enumerate(SAMPLE_TRANSACTION_TEMPLATES[template_key], start=1):
+        total = (
+            template["subtotal"]
+            + template.get("tax", 0.0)
+            + template.get("tip", 0.0)
+            + template.get("delivery_fee", 0.0)
+        )
+        order_dt = now - timedelta(days=template["days_ago"])
+        order_id = template.get("order_id") or f"{merchant_name[:2].upper()}-{order_dt.strftime('%Y%m%d')}-{idx:03d}"
+
+        sample_tx = {
+            "id": f"sample-{template_key}-{idx}",
+            "merchant_id": merchant_id,
+            "merchant_name": merchant_name,
+            "external_id": order_id,
+            "datetime": order_dt.isoformat(),
+            "url": template.get("url"),
+            "order_status": template.get("status", "DELIVERED"),
+            "payment_methods": [
+                {
+                    "type": "CARD",
+                    "brand": template.get("card_brand", "VISA"),
+                    "transaction_amount": f"{total:.2f}",
+                    "last_four": template.get("last_four", "4242"),
+                }
+            ],
+            "price": {
+                "amount": f"{total:.2f}",
+                "currency": "USD",
+                "sub_total": f"{template['subtotal']:.2f}",
+                "tax": f"{template.get('tax', 0.0):.2f}",
+                "tip": f"{template.get('tip', 0.0):.2f}",
+                "adjustments": [],
+            },
+            "products": [
+                {
+                    "name": item["name"],
+                    "quantity": item.get("quantity", 1),
+                    "price": f"{item.get('price', 0.0):.2f}",
+                }
+                for item in template.get("items", [])
+            ],
+            "metadata": {
+                "order_id": order_id,
+                "status": template.get("status", "DELIVERED"),
+                "restaurant": template.get("restaurant"),
+                "source": "sample",
+            },
+        }
+
+        delivery_fee = template.get("delivery_fee")
+        if delivery_fee:
+            sample_tx["price"]["adjustments"].append(
+                {"type": "FEE", "label": "Delivery Fee", "amount": f"{delivery_fee:.2f}"}
+            )
+
+        samples.append(sample_tx)
+
+    return samples
 
 
 @router.get("/sync")
@@ -133,26 +314,14 @@ async def sync_transactions(
             limit=limit,
         )
         
-        transactions_payload = []
-        for txn in sync_response.transactions:
-            txn_payload = txn.model_dump() if hasattr(txn, "model_dump") else dict(txn)
-            txn_payload.setdefault("merchant_id", selected_account.merchant_id)
-            txn_payload.setdefault("merchant_name", selected_account.merchant_name)
-            price = txn_payload.get("price")
-            if isinstance(price, dict):
-                amount = price.get("amount")
-                if amount and isinstance(amount, (int, float, str)):
-                    try:
-                        txn_payload["price_amount"] = float(amount)
-                    except ValueError:
-                        logger.debug("Unable to parse price amount %s", amount)
-                txn_payload["price_currency"] = price.get("currency")
-            metadata = txn_payload.get("metadata") or {}
-            txn_payload["order_id"] = metadata.get("order_id") or metadata.get("external_id")
-            txn_payload["transaction_status"] = (
-                txn_payload.get("order_status") or metadata.get("status")
+        transactions_payload = [
+            _normalize_transaction(
+                txn,
+                str(selected_account.merchant_id),
+                selected_account.merchant_name,
             )
-            transactions_payload.append(txn_payload)
+            for txn in sync_response.transactions
+        ]
         
         merchant_payload = sync_response.merchant or {
             "id": int(selected_account.merchant_id)
@@ -160,6 +329,34 @@ async def sync_transactions(
             else selected_account.merchant_id,
             "name": selected_account.merchant_name,
         }
+
+        fallback_used = False
+
+        if not transactions_payload:
+            logger.warning(
+                "Knot returned 0 transactions for user %s merchant %s; attempting sample fallback.",
+                current_user.id,
+                merchant_payload.get("name"),
+            )
+            sample_transactions = _build_sample_transactions(
+                str(selected_account.merchant_id),
+                selected_account.merchant_name,
+            )
+            if sample_transactions:
+                fallback_used = True
+                transactions_payload = [
+                    _normalize_transaction(
+                        txn,
+                        str(selected_account.merchant_id),
+                        selected_account.merchant_name,
+                    )
+                    for txn in sample_transactions
+                ]
+                logger.info(
+                    "Loaded %s sample transaction(s) for merchant %s",
+                    len(transactions_payload),
+                    merchant_payload.get("name"),
+                )
         
         logger.info(
             "✅ Synced %s transaction(s) for merchant %s",
@@ -169,14 +366,23 @@ async def sync_transactions(
         
         # Cache results
         user_cache = TRANSACTIONS_CACHE.setdefault(current_user.id, {})
-        user_cache[merchant_id_str] = {
+        user_cache_entry = {
             "transactions": transactions_payload,
             "next_cursor": sync_response.next_cursor,
             "limit": sync_response.limit or limit,
             "synced_at": datetime.utcnow().isoformat(),
             "merchant": merchant_payload,
-            "raw_response": sync_response.model_dump(),
         }
+        user_cache[merchant_id_str] = user_cache_entry
+        raw_response = sync_response.model_dump()
+        if fallback_used:
+            raw_response = {
+                **raw_response,
+                "fallback": "sample_transactions",
+                "transactions": transactions_payload,
+            }
+        user_cache_entry["raw_response"] = raw_response
+
         file_path = _dump_transactions_to_file(
             current_user.id,
             merchant_id_str,
@@ -187,7 +393,7 @@ async def sync_transactions(
                 "next_cursor": sync_response.next_cursor,
                 "has_more": sync_response.has_more,
                 "limit": sync_response.limit or limit,
-                "raw_response": sync_response.model_dump(),
+                "raw_response": raw_response,
             },
         )
         
@@ -202,7 +408,8 @@ async def sync_transactions(
             "cursor": sync_response.next_cursor,
             "synced_at": user_cache[merchant_id_str]["synced_at"],
             "file_path": str(file_path),
-            "raw_response": sync_response.model_dump(),
+            "raw_response": raw_response,
+            "fallback_used": fallback_used,
         }
         
     except KnotAPIError as e:
