@@ -165,12 +165,11 @@ export default function OnboardingPage() {
         onError: (product, errorCode, errorDescription) => {
           console.error("❌ Knot SDK error:", errorCode, errorDescription);
           setError(`${errorCode}: ${errorDescription}`);
-          setCurrentStep(0); 
+          setCurrentStep(0);
           setLoading(false);
         },
 
         onEvent: async (product, details) => {
-
           console.log("🎯🎯🎯 onSuccess callback FIRED! 🎯🎯🎯");
           console.log("🎯 Product:", product);
           console.log("🎯 Details:", JSON.stringify(details, null, 2));

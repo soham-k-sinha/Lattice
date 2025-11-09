@@ -113,6 +113,9 @@ importers:
       date-fns:
         specifier: 4.1.0
         version: 4.1.0
+      dedalus-labs:
+        specifier: 0.1.0-alpha.4
+        version: 0.1.0-alpha.4
       embla-carousel-react:
         specifier: 8.5.1
         version: 8.5.1(react@19.2.0)
@@ -1341,6 +1344,9 @@ packages:
 
   decimal.js-light@2.5.1:
     resolution: {integrity: sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg==}
+
+  dedalus-labs@0.1.0-alpha.4:
+    resolution: {integrity: sha512-e3hnnEB2te5jpm72+Z7GN+MrCeELi0YR/W3ieBJRq5XBEdmxxLmtIRxElP4piKKzAncvrVOVd5yluMbGhoQrpw==}
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -2849,6 +2855,8 @@ snapshots:
   date-fns@4.1.0: {}
 
   decimal.js-light@2.5.1: {}
+
+  dedalus-labs@0.1.0-alpha.4: {}
 
   detect-libc@2.1.2: {}
 

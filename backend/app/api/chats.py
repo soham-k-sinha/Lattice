@@ -94,51 +94,63 @@ async def create_message(
         MOCK_MESSAGES[chat_id] = []
     MOCK_MESSAGES[chat_id].append(new_message)
     
-    # If user message, generate AI response via individual agent
+    # If user message, optionally invoke the advisor agent
     if message.sender_type == "user":
-        agent_output = None
-        ai_message: MessageResponse | None = None
+        content = message.content.strip()
+        content_lower = content.lower()
+        trigger = "@advisor"
+        if content_lower.startswith(trigger):
+            agent_output = None
+            ai_message: MessageResponse | None = None
 
-        try:
-            logger.info(f"AGENT RUN: invoking individual agent for user {current_user.id} with message {message.content}")
-            mock_purchases = load_user_transactions(current_user.id)
-            today_str = datetime.utcnow().date().isoformat()
-            agent_output = await run_individual_agent(
-                mock_purchases=mock_purchases,
-                user_query=message.content,
-                today=today_str,
-            )
-            print(f"AGENT OUTPUT: {agent_output}")
-        except Exception as exc:
-            logger.exception(
-                "Failed to run individual agent for user %s: %s",
-                current_user.id,
-                exc,
-            )
-            agent_output = (
-                "I ran into an issue generating a personalized recommendation. "
-                "Please try again later."
-            )
+            user_query = content[len(trigger):].strip()
 
-        ai_response = {
-            "id": _message_id_counter,
-            "chat_id": chat_id,
-            "sender_id": None,
-            "sender_type": "ai",
-            "content": agent_output,
-            "thinking": [],
-            "action": None,
-            "drawer_data": None,
-            "created_at": datetime.utcnow().isoformat(),
-        }
-        _message_id_counter += 1
-        MOCK_MESSAGES[chat_id].append(ai_response)
-        ai_message = MessageResponse(**ai_response)
-    
-        return MessageSendResponse(
-            user_message=MessageResponse(**new_message),
-            ai_message=ai_message,
-        )
+            if not user_query:
+                agent_output = "Hi there! Add a question after `@advisor` so I know how to help. 🙂"
+            else:
+                try:
+                    logger.info(
+                        "AGENT RUN: invoking individual agent for user %s with message %s",
+                        current_user.id,
+                        user_query,
+                    )
+                    mock_purchases = load_user_transactions(current_user.id)
+                    today_str = datetime.utcnow().date().isoformat()
+                    agent_output = await run_individual_agent(
+                        mock_purchases=mock_purchases,
+                        user_query=user_query,
+                        today=today_str,
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to run individual agent for user %s: %s",
+                        current_user.id,
+                        exc,
+                    )
+                    agent_output = (
+                        "I ran into an issue generating a personalized recommendation. "
+                        "Please try again later."
+                    )
+
+            ai_response = {
+                "id": _message_id_counter,
+                "chat_id": chat_id,
+                "sender_id": None,
+                "sender_type": "ai",
+                "content": agent_output,
+                "thinking": [],
+                "action": None,
+                "drawer_data": None,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            _message_id_counter += 1
+            MOCK_MESSAGES[chat_id].append(ai_response)
+            ai_message = MessageResponse(**ai_response)
+        
+            return MessageSendResponse(
+                user_message=MessageResponse(**new_message),
+                ai_message=ai_message,
+            )
 
     return MessageSendResponse(
         user_message=MessageResponse(**new_message),

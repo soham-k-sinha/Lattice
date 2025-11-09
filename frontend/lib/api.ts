@@ -39,13 +39,18 @@ async function fetchWithAuth(url: string, options?: RequestInit) {
   return response
 }
 
+export interface AuthToken {
+  access_token: string
+  token_type: string
+}
+
 /**
  * API Client
  */
 export const api = {
   // ============= Authentication =============
   
-  async signup(email: string, password: string, name: string) {
+  async signup(email: string, password: string, name: string): Promise<AuthToken> {
     const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
       method: 'POST',
       headers: { 
@@ -60,10 +65,11 @@ export const api = {
       throw new Error(error.detail || 'Signup failed')
     }
     
-    return response.json()
+    const data = await response.json()
+    return data as AuthToken
   },
   
-  async login(email: string, password: string) {
+  async login(email: string, password: string): Promise<AuthToken> {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 
@@ -78,7 +84,8 @@ export const api = {
       throw new Error(error.detail || 'Login failed')
     }
     
-    return response.json()
+    const data = await response.json()
+    return data as AuthToken
   },
   
   async getSession() {
@@ -198,7 +205,7 @@ export const api = {
     }
   },
   
-  async sendMessage(chatId: number, content: string) {
+  async sendMessage(chatId: number, content: string): Promise<SendMessageResponse> {
     const response = await fetchWithAuth(`/api/chats/${chatId}/messages`, {
       method: 'POST',
       body: JSON.stringify({ content, sender_type: 'user' }),
@@ -427,6 +434,11 @@ export interface Chat {
   last_message?: string
   updated_at: string
   messages?: Message[]
+}
+
+export interface SendMessageResponse {
+  user_message: Message
+  ai_message?: Message | null
 }
 
 export interface Group {
