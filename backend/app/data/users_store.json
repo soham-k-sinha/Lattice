@@ -1,5 +1,5 @@
 {
-  "next_id": 9,
+  "next_id": 8,
   "users": [
     {
       "id": 1,
@@ -59,33 +59,23 @@
     },
     {
       "id": 6,
-      "name": "soham",
-      "email": "soham@gmail.com",
-      "hashed_password": "$pbkdf2-sha256$29000$bg3hnBPi/F/rnfM.x/g/hw$Nb9V6i0uG1TSg9PmMRs.21oXKjbz/0GLmVYzaCGOOT4",
+      "name": "Ak",
+      "email": "ak@gmail.com",
+      "hashed_password": "$pbkdf2-sha256$29000$R8j5/987ZwwhJKRUihFCiA$o9fJbHpefNCcxleSQArXrivZtlEwt4lJhTxOYGiFJZs",
       "onboarding_status": "incomplete",
       "preferences": {},
-      "created_at": "2025-11-09T04:40:07.586198",
-      "updated_at": "2025-11-09T04:40:07.586198"
+      "created_at": "2025-11-09T12:12:58.198706",
+      "updated_at": "2025-11-09T12:12:58.198706"
     },
     {
       "id": 7,
-      "name": "ad",
-      "email": "xyz@gmail.com",
-      "hashed_password": "$pbkdf2-sha256$29000$kxJizNlba.09R0gp5Tyn1A$aEKb.Gq2IIY0APaA6z0rmkKdg73EH.LWFQ.qmrEjtjU",
+      "name": "app",
+      "email": "ap@gmail.com",
+      "hashed_password": "$pbkdf2-sha256$29000$zNl7LwUgZAxhbG1NifEeww$Nyi4CHRmGRTWVY/wdXbwOplKnjxTZxqtDX0bTwTvikI",
       "onboarding_status": "incomplete",
       "preferences": {},
-      "created_at": "2025-11-09T04:41:00.069837",
-      "updated_at": "2025-11-09T04:41:00.069837"
-    },
-    {
-      "id": 8,
-      "name": "Hello",
-      "email": "hello@gmail.com",
-      "hashed_password": "$pbkdf2-sha256$29000$G.Mco7T2nhOiNKb0HgPgXA$XELJqWz0izldKeawKxG7bwsY7.BoejNkG965GOxiL4I",
-      "onboarding_status": "incomplete",
-      "preferences": {},
-      "created_at": "2025-11-09T05:33:42.548444",
-      "updated_at": "2025-11-09T05:33:42.548444"
+      "created_at": "2025-11-09T12:20:38.065959",
+      "updated_at": "2025-11-09T12:20:38.065959"
     }
   ]
 }

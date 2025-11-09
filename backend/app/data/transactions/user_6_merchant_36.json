@@ -1,0 +1,175 @@
+{
+  "synced_at": "2025-11-09T12:15:12.921465",
+  "merchant": {
+    "id": 36,
+    "name": "Uber Eats"
+  },
+  "transactions": [
+    {
+      "id": "e85e071b-ff41-43de-85d8-82ff25d52764",
+      "merchant_id": null,
+      "external_id": "4026b193-20a5-40cd-ae2e-1403757d48c7",
+      "datetime": "2025-05-16T03:53:02+00:00",
+      "url": "https://www.ubereats.com/orders/4026b193-20a5-40cd-ae2e-1403757d48c7",
+      "order_status": "COMPLETED",
+      "payment_methods": [
+        {
+          "external_id": null,
+          "type": "CARD",
+          "brand": "VISA",
+          "last_four": "3465",
+          "name": null,
+          "transaction_amount": "21.52"
+        }
+      ],
+      "price": {
+        "sub_total": "16.98",
+        "adjustments": [
+          {
+            "type": "FEE",
+            "label": "Service Fee",
+            "amount": "3.35"
+          },
+          {
+            "type": "TAX",
+            "label": "Tax",
+            "amount": "1.19"
+          }
+        ],
+        "total": "21.52",
+        "currency": "USD"
+      },
+      "products": [
+        {
+          "external_id": "45094aaa-303c-44f5-97d1-545f6225e2f2",
+          "name": "Gyro on a Pita",
+          "url": "https://www.ubereats.com/store-browse-uuid/698d3f1b-b4a7-5115-a504-665eec2f81e7/3e262ea2-a878-45de-9edb-98d33dc005c9/31d624e9-1200-4a29-be1a-85f72e988168/ccbd1959-8704-4c33-a968-aef7dc831630?storeInfoHeader=true",
+          "quantity": 1,
+          "eligibility": [],
+          "price": {
+            "sub_total": null,
+            "total": "10.49",
+            "unit_price": "10.49"
+          }
+        },
+        {
+          "external_id": "d7598b07-4578-4ced-8ef8-4f4f51ce5543",
+          "name": "Hot Sauce",
+          "url": "https://www.ubereats.com/store-browse-uuid/698d3f1b-b4a7-5115-a504-665eec2f81e7/3e262ea2-a878-45de-9edb-98d33dc005c9/fe354782-49d7-4fc8-97e4-21290cc1f757/6b101cfb-7c8d-4481-a8b5-46abbd0f53bf?storeInfoHeader=true",
+          "quantity": 1,
+          "eligibility": [],
+          "price": {
+            "sub_total": null,
+            "total": "0.00",
+            "unit_price": "0.00"
+          }
+        },
+        {
+          "external_id": "6953aa15-848a-4143-b4bd-82e06bc652cc",
+          "name": "Onion Rings",
+          "url": "https://www.ubereats.com/store-browse-uuid/698d3f1b-b4a7-5115-a504-665eec2f81e7/3e262ea2-a878-45de-9edb-98d33dc005c9/f0745c0b-5d32-4960-9280-24b9b87013a8/ae6cc92f-cf1a-4406-a399-14010f4a445d?storeInfoHeader=true",
+          "quantity": 1,
+          "eligibility": [],
+          "price": {
+            "sub_total": null,
+            "total": "6.49",
+            "unit_price": "6.49"
+          }
+        }
+      ],
+      "metadata": {},
+      "merchant_name": "Uber Eats",
+      "price_currency": "USD",
+      "order_id": null,
+      "transaction_status": "COMPLETED"
+    }
+  ],
+  "next_cursor": null,
+  "has_more": null,
+  "limit": 100,
+  "raw_response": {
+    "merchant": {
+      "id": 36,
+      "name": "Uber Eats"
+    },
+    "transactions": [
+      {
+        "id": "e85e071b-ff41-43de-85d8-82ff25d52764",
+        "merchant_id": null,
+        "external_id": "4026b193-20a5-40cd-ae2e-1403757d48c7",
+        "datetime": "2025-05-16T03:53:02+00:00",
+        "url": "https://www.ubereats.com/orders/4026b193-20a5-40cd-ae2e-1403757d48c7",
+        "order_status": "COMPLETED",
+        "payment_methods": [
+          {
+            "external_id": null,
+            "type": "CARD",
+            "brand": "VISA",
+            "last_four": "3465",
+            "name": null,
+            "transaction_amount": "21.52"
+          }
+        ],
+        "price": {
+          "sub_total": "16.98",
+          "adjustments": [
+            {
+              "type": "FEE",
+              "label": "Service Fee",
+              "amount": "3.35"
+            },
+            {
+              "type": "TAX",
+              "label": "Tax",
+              "amount": "1.19"
+            }
+          ],
+          "total": "21.52",
+          "currency": "USD"
+        },
+        "products": [
+          {
+            "external_id": "45094aaa-303c-44f5-97d1-545f6225e2f2",
+            "name": "Gyro on a Pita",
+            "url": "https://www.ubereats.com/store-browse-uuid/698d3f1b-b4a7-5115-a504-665eec2f81e7/3e262ea2-a878-45de-9edb-98d33dc005c9/31d624e9-1200-4a29-be1a-85f72e988168/ccbd1959-8704-4c33-a968-aef7dc831630?storeInfoHeader=true",
+            "quantity": 1,
+            "eligibility": [],
+            "price": {
+              "sub_total": null,
+              "total": "10.49",
+              "unit_price": "10.49"
+            }
+          },
+          {
+            "external_id": "d7598b07-4578-4ced-8ef8-4f4f51ce5543",
+            "name": "Hot Sauce",
+            "url": "https://www.ubereats.com/store-browse-uuid/698d3f1b-b4a7-5115-a504-665eec2f81e7/3e262ea2-a878-45de-9edb-98d33dc005c9/fe354782-49d7-4fc8-97e4-21290cc1f757/6b101cfb-7c8d-4481-a8b5-46abbd0f53bf?storeInfoHeader=true",
+            "quantity": 1,
+            "eligibility": [],
+            "price": {
+              "sub_total": null,
+              "total": "0.00",
+              "unit_price": "0.00"
+            }
+          },
+          {
+            "external_id": "6953aa15-848a-4143-b4bd-82e06bc652cc",
+            "name": "Onion Rings",
+            "url": "https://www.ubereats.com/store-browse-uuid/698d3f1b-b4a7-5115-a504-665eec2f81e7/3e262ea2-a878-45de-9edb-98d33dc005c9/f0745c0b-5d32-4960-9280-24b9b87013a8/ae6cc92f-cf1a-4406-a399-14010f4a445d?storeInfoHeader=true",
+            "quantity": 1,
+            "eligibility": [],
+            "price": {
+              "sub_total": null,
+              "total": "6.49",
+              "unit_price": "6.49"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "next_cursor": null,
+    "has_more": null,
+    "limit": 100
+  }
+}

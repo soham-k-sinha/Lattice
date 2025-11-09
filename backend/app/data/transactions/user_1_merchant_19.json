@@ -1,0 +1,21 @@
+{
+  "synced_at": "2025-11-09T12:26:16.484156",
+  "merchant": {
+    "id": 19,
+    "name": "DoorDash"
+  },
+  "transactions": [],
+  "next_cursor": null,
+  "has_more": null,
+  "limit": 100,
+  "raw_response": {
+    "merchant": {
+      "id": 19,
+      "name": "DoorDash"
+    },
+    "transactions": [],
+    "next_cursor": null,
+    "has_more": null,
+    "limit": 100
+  }
+}
