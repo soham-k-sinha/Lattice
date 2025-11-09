@@ -8,13 +8,19 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Optional
 
 from dedalus_labs import AsyncDedalus, DedalusRunner
+try:
+    from dedalus_labs import APITimeoutError  # type: ignore
+except ImportError:  # pragma: no cover - library version without explicit export
+    class APITimeoutError(Exception):
+        """Fallback timeout error type when dedalus_labs does not expose it."""
+        pass
 from dotenv import load_dotenv
 from loguru import logger
 
 
 FALLBACK_WINDOW_DAYS = 30
 FALLBACK_RECENT_DAYS = 7
-DEFAULT_TIMEOUT_SECONDS = 25
+DEFAULT_TIMEOUT_SECONDS = 60
 
 
 def _safe_float(value: Any) -> float:
@@ -191,7 +197,7 @@ D) DECISION & EXPLANATION
 
 OUTPUT FORMAT
 -------------
-Return BOTH a really informative human summary and a readable and well formatted JSON block for programmatic use, like this (can change format a bit based on what the user has said):
+Return a really informative human summary like this (can change format a bit based on what the user has said):
 
 **Purchase Recommendation:** <Buy Now | Wait | Avoid>
 **Reasoning Summary:**
@@ -210,28 +216,6 @@ Return BOTH a really informative human summary and a readable and well formatted
 **Sentiment Reasoning (transparent):**
 - <step-by-step notes you used to interpret public sentiment>
 
-```json
-{{
-  "recommendation": "<Buy Now | Wait | Avoid>",
-  "confidence": "<Low | Medium | High>",
-  "financials": {{
-    "last_7d_spend": 0,
-    "last_30d_spend": 0,
-    "discretionary_30d_spend": 0,
-    "recent_risk_flag": false,
-    "notes": ""
-  }},
-  "market_view": {{
-    "trend": "unclear",
-    "evidence": ["", ""]
-  }},
-  "sentiment_view": {{
-    "polarity": "mixed",
-    "score": 0.0,
-    "evidence": ["", ""]
-  }},
-  "rationale": ""
-}}
 CONSTRAINTS
 
 If you can't find sufficient data to make a confident recommendation, use average price and don't mention that you can't find sufficient data.
@@ -247,25 +231,49 @@ Use a lot of related emojis while explaining your step-by-step reasoning for fin
 Now proceed.
     """
 
-    try:
+    async def _execute_agent(model: str, use_mcp: bool, timeout_value: int) -> str:
+        kwargs: dict[str, Any] = {
+            "input": prompt,
+            "model": model,
+        }
+        if use_mcp:
+            kwargs["mcp_servers"] = ["windsor/brave-search-mcp"]
         result = await asyncio.wait_for(
-            runner.run(
-                input=prompt,
-                model="openai/gpt-5",
-                mcp_servers=[
-                    "windsor/brave-search-mcp",
-                ],
-            ),
-            timeout=timeout_seconds,
+            runner.run(**kwargs),
+            timeout=timeout_value,
         )
         return result.final_output
-    except asyncio.TimeoutError:
+
+    # Attempt 1: full experience (Brave MCP, gpt-5)
+    try:
+        return await _execute_agent("openai/gpt-5", True, timeout_seconds)
+    except (asyncio.TimeoutError, APITimeoutError) as timeout_exc:
         logger.warning(
-            "Individual agent timed out after %s seconds; returning deterministic fallback.",
+            "Individual agent primary attempt timed out after %s seconds (%s). Retrying with lighter settings.",
             timeout_seconds,
+            timeout_exc,
         )
-    except Exception as exc:
-        logger.exception("Individual agent failed; using fallback. Error: %s", exc)
+    except Exception as primary_exc:
+        logger.warning(
+            "Individual agent primary attempt failed (%s). Retrying with lighter settings.",
+            primary_exc,
+        )
+
+    # Attempt 2: lighter model, no MCP tools (faster & more reliable)
+    secondary_timeout = max(timeout_seconds // 2, 15)
+    try:
+        return await _execute_agent("openai/gpt-4.1-mini", False, secondary_timeout)
+    except (asyncio.TimeoutError, APITimeoutError) as timeout_exc:
+        logger.error(
+            "Individual agent secondary attempt also timed out after %s seconds (%s).",
+            secondary_timeout,
+            timeout_exc,
+        )
+    except Exception as secondary_exc:
+        logger.exception(
+            "Individual agent secondary attempt failed; falling back. Error: %s",
+            secondary_exc,
+        )
 
     return _build_deterministic_recommendation(mock_purchases, user_query, today)
 

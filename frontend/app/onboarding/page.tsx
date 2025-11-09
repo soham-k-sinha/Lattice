@@ -13,14 +13,20 @@ const steps = [
   { id: 3, label: "Linked" },
 ];
 
-const merchants = [
-  { name: "Amazon", id: 44 },
-  { name: "Costco", id: 165 },
-  { name: "Doordash", id: 19 },
-  { name: "Instacart", id: 40 },
-  { name: "Target", id: 12 },
-  { name: "Ubereats", id: 36 },
-  { name: "Walmart", id: 45 },
+type MerchantOption = {
+  name: string;
+  id: number;
+  slug: string;
+};
+
+const merchants: MerchantOption[] = [
+  { name: "Amazon", id: 44, slug: "amazon" },
+  { name: "Costco", id: 165, slug: "costco" },
+  { name: "DoorDash", id: 19, slug: "doordash" },
+  { name: "Instacart", id: 40, slug: "instacart" },
+  { name: "Target", id: 12, slug: "target" },
+  { name: "Uber Eats", id: 36, slug: "ubereats" },
+  { name: "Walmart", id: 45, slug: "walmart" },
 ];
 
 export default function OnboardingPage() {
@@ -30,7 +36,8 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [sdkLoaded, setSdkLoaded] = useState(false);
-  const [selectedMerchant, setSelectedMerchant] = useState<number | null>(null);
+  const [selectedMerchant, setSelectedMerchant] =
+    useState<MerchantOption | null>(null);
   const [showMerchantSelection, setShowMerchantSelection] = useState(true);
 
   // Check if Knot SDK is loaded
@@ -147,13 +154,13 @@ export default function OnboardingPage() {
       // Step 3: Open Knot SDK with configuration
       console.log("🎨 Opening Knot interface...");
       console.log(`🌍 Using Knot environment: ${startResult.environment}`);
-      console.log(`🏪 Using merchant ID: ${selectedMerchant}`);
+      console.log(`🏪 Using merchant ID: ${selectedMerchant.id}`);
       knotapi.open({
         sessionId: startResult.session_id,
         clientId: "a390e79d-2920-4440-9ba1-b747bc92790b", // Your Knot client ID
         environment: startResult.environment as "development" | "production",
         product: "transaction_link",
-        merchantIds: [selectedMerchant],
+        merchantIds: [selectedMerchant.id],
         entryPoint: "onboarding",
         useCategories: true,
         useSearch: true,
@@ -208,6 +215,11 @@ export default function OnboardingPage() {
 
             // Verify accounts were stored by fetching them
             console.log("🔍 Now fetching accounts from backend...");
+            let merchantIdForSync: string | undefined =
+              selectedMerchant !== null
+                ? String(selectedMerchant.id)
+                : undefined;
+
             try {
               const accountsResult = await api.getAccounts();
               console.log("✅ getAccounts SUCCESS!");
@@ -228,21 +240,66 @@ export default function OnboardingPage() {
                   "This means Knot session completed but no accounts were saved"
                 );
               }
+
+              if (accountsResult.accounts && selectedMerchant) {
+                const normalize = (value: unknown) =>
+                  String(value ?? "")
+                    .toLowerCase()
+                    .replace(/\s+/g, "");
+
+                const targetCandidates = [
+                  normalize(selectedMerchant.id),
+                  normalize(selectedMerchant.slug),
+                  normalize(selectedMerchant.name),
+                ];
+
+                const matchedAccount = accountsResult.accounts.find(
+                  (acc: any) => {
+                    const candidateValues = [
+                      acc?.knot_merchant_id,
+                      acc?.knotMerchantId,
+                      acc?.merchant_id,
+                      acc?.merchantId,
+                      acc?.id,
+                      acc?.institution,
+                      acc?.merchant_name,
+                    ];
+                    return candidateValues.some((candidate) =>
+                      targetCandidates.includes(normalize(candidate))
+                    );
+                  }
+                );
+
+                if (matchedAccount) {
+                  const resolvedId =
+                    matchedAccount.knot_merchant_id ??
+                    matchedAccount.knotMerchantId ??
+                    matchedAccount.merchant_id ??
+                    matchedAccount.merchantId ??
+                    matchedAccount.id;
+
+                  if (resolvedId) {
+                    merchantIdForSync = String(resolvedId);
+                    console.log(
+                      "🔁 Resolved merchant identifier from linked accounts:",
+                      merchantIdForSync
+                    );
+                  }
+                }
+              }
             } catch (verifyErr: any) {
               console.error("❌ getAccounts failed:", verifyErr);
               console.error("❌ Error message:", verifyErr.message);
             }
 
             // Sync transactions for the selected merchant (and log everything)
-            const merchantIdParam =
-              selectedMerchant !== null ? String(selectedMerchant) : undefined;
             console.log(
               "🧾 Preparing to sync transactions for merchant:",
-              merchantIdParam
+              merchantIdForSync
             );
             try {
               const syncResult = await api.syncTransactions(
-                merchantIdParam,
+                merchantIdForSync,
                 100
               );
               console.log("🧾 syncTransactions SUCCESS!");
@@ -269,13 +326,34 @@ export default function OnboardingPage() {
             } catch (syncErr: any) {
               console.error("❌ syncTransactions failed:", syncErr);
               console.error("❌ Error message:", syncErr.message);
+              if (
+                syncErr?.message?.toLowerCase().includes("not linked") ||
+                syncErr?.message?.toLowerCase().includes("404")
+              ) {
+                console.warn(
+                  "⚠️ Retrying sync without explicit merchant ID..."
+                );
+                try {
+                  const fallbackResult = await api.syncTransactions(
+                    undefined,
+                    100
+                  );
+                  console.log("🧾 Fallback syncTransactions SUCCESS!");
+                  console.log(
+                    "🧾 Raw fallback response:",
+                    JSON.stringify(fallbackResult, null, 2)
+                  );
+                } catch (fallbackErr: any) {
+                  console.error("❌ Fallback sync also failed:", fallbackErr);
+                }
+              }
             }
 
             // Fetch cached transactions for additional logging
             console.log("📚 Fetching cached transactions after sync...");
             try {
               const cachedResult = await api.getTransactions(
-                merchantIdParam,
+                merchantIdForSync,
                 50
               );
               console.log("📚 getTransactions SUCCESS!");
@@ -343,6 +421,7 @@ export default function OnboardingPage() {
     setShowMerchantSelection(true);
     setCurrentStep(0);
     setLoading(false);
+    setSelectedMerchant(null);
   };
 
   return (
@@ -373,9 +452,9 @@ export default function OnboardingPage() {
               {merchants.map((merchant) => (
                 <motion.button
                   key={merchant.id}
-                  onClick={() => setSelectedMerchant(merchant.id)}
+                  onClick={() => setSelectedMerchant(merchant)}
                   className={`p-6 rounded-lg border-2 transition-all ${
-                    selectedMerchant === merchant.id
+                    selectedMerchant?.id === merchant.id
                       ? "border-accent bg-accent/10"
                       : "border-border hover:border-accent/50"
                   }`}
@@ -385,7 +464,7 @@ export default function OnboardingPage() {
                   <div className="flex flex-col items-center gap-3">
                     <Store
                       className={`w-8 h-8 ${
-                        selectedMerchant === merchant.id
+                        selectedMerchant?.id === merchant.id
                           ? "text-accent"
                           : "text-muted-foreground"
                       }`}
