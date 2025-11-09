@@ -1,0 +1,11 @@
+{
+  "synced_at": "2025-11-09T05:34:57.330803",
+  "merchant": {
+    "id": 44,
+    "name": "Amazon"
+  },
+  "transactions": [],
+  "next_cursor": null,
+  "has_more": null,
+  "limit": 100
+}

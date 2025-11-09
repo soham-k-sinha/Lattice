@@ -10,6 +10,7 @@ from loguru import logger
 from app.middleware.auth import get_current_user
 from app.models import User
 from app.integrations.knot import KnotClient, KnotAPIError
+from app.api.onboarding import KNOT_EXTERNAL_IDS
 
 router = APIRouter()
 
@@ -51,8 +52,11 @@ async def sync_transactions(
     
     try:
         # First, get user's linked accounts
-        logger.info(f"Fetching accounts for user {current_user.id}")
-        accounts = await knot.get_accounts(str(current_user.id))
+        external_user_id = KNOT_EXTERNAL_IDS.get(current_user.id, str(current_user.id))
+        logger.info(
+            f"Fetching accounts for user {current_user.id} (external_id={external_user_id})"
+        )
+        accounts = await knot.get_accounts(external_user_id)
         
         if not accounts:
             return {
@@ -93,7 +97,7 @@ async def sync_transactions(
         )
         
         sync_response = await knot.sync_transactions(
-            external_user_id=str(current_user.id),
+            external_user_id=external_user_id,
             merchant_id=str(selected_account.merchant_id),
             cursor=cursor,
             limit=limit,

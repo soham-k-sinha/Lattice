@@ -14,11 +14,8 @@ from app.api.schemas import (
 from app.config.settings import settings
 from app.middleware.auth import get_current_user, get_current_user_optional
 from app.models import OnboardingStatus, User, get_db
-from app.utils.security import (
-    create_access_token,
-    get_password_hash,
-    verify_password,
-)
+from app.utils.security import create_access_token, get_password_hash, verify_password
+from app.utils import user_store
 
 router = APIRouter()
 
@@ -26,17 +23,23 @@ router = APIRouter()
 @router.post("/signup", response_model=Token, status_code=status.HTTP_201_CREATED)
 def signup(user_data: UserSignup) -> Token:
     """Register a new user."""
-    # DEBUG mode: Allow signup but return mock token
+    # DEBUG mode: Use local JSON store for persistence
     if settings.DEBUG:
-        mock_token = create_access_token(
+        new_user = user_store.create_user(
+            name=user_data.name,
+            email=user_data.email,
+            password=user_data.password,
+        )
+        access_token = create_access_token(
             data={
-                "user_id": 999,
-                "email": user_data.email,
-                "name": user_data.name,
+                "user_id": new_user["id"],
+                "email": new_user["email"],
+                "name": new_user["name"],
+                "onboarding_status": new_user["onboarding_status"],
             },
             expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
         )
-        return Token(access_token=mock_token)
+        return Token(access_token=access_token)
     
     # Production mode: Use database
     from app.models import get_db
@@ -80,28 +83,22 @@ def login(user_data: UserLogin) -> Token:
     """Authenticate user and return access token."""
     # DEBUG mode: Use mock authentication
     if settings.DEBUG:
-        # Demo accounts
-        demo_accounts = {
-            "alice@demo.com": {"id": 1, "name": "Alice Demo", "password": "password123"},
-            "bob@test.com": {"id": 2, "name": "Bob Test", "password": "password123"},
-            "demo@example.com": {"id": 3, "name": "Demo User", "password": "demo123"},
-        }
-        
-        if user_data.email in demo_accounts:
-            demo_user = demo_accounts[user_data.email]
-            if user_data.password == demo_user["password"]:
-                # Create access token
-                access_token = create_access_token(
-                    data={
-                        "user_id": demo_user["id"],
-                        "email": user_data.email,
-                        "name": demo_user["name"],
-                    },
-                    expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
-                )
-                return Token(access_token=access_token)
-        
-        # Invalid credentials
+        stored_user = user_store.authenticate_user(
+            email=user_data.email,
+            password=user_data.password,
+        )
+        if stored_user:
+            access_token = create_access_token(
+                data={
+                    "user_id": stored_user["id"],
+                    "email": stored_user["email"],
+                    "name": stored_user["name"],
+                    "onboarding_status": stored_user["onboarding_status"],
+                },
+                expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+            )
+            return Token(access_token=access_token)
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

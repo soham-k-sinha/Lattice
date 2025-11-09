@@ -16,6 +16,36 @@ router = APIRouter()
 
 # In-memory storage for Knot accounts (no database needed)
 KNOT_LINKED_ACCOUNTS = {}  # user_id -> list of accounts
+KNOT_EXTERNAL_IDS: dict[int, str] = {}
+
+
+def _build_mock_accounts(user: User) -> list[dict[str, str | float | dict[str, bool] | int]]:
+    """Create deterministic mock accounts for a user in sandbox mode."""
+    base_institutions = [
+        ("Amazon", {"transactions": True, "cards": True}),
+        ("DoorDash", {"transactions": True}),
+        ("UberEats", {"transactions": True}),
+    ]
+
+    accounts: list[dict[str, str | float | dict[str, bool] | int]] = []
+    for idx, (institution, permissions) in enumerate(base_institutions, start=1):
+        accounts.append(
+            {
+                "id": f"mock_account_{user.id}_{idx}",
+                "user_id": user.id,
+                "institution": institution,
+                "account_name": f"{institution} Account",
+                "account_type": "transaction_link",
+                "balance": 0.0,
+                "currency": "USD",
+                "permissions": permissions,
+                "status": "active",
+                "last_synced": datetime.utcnow().isoformat(),
+                "knot_account_id": None,
+                "knot_merchant_id": institution.lower(),
+            }
+        )
+    return accounts
 
 
 # ==================== REQUEST/RESPONSE MODELS ====================
@@ -95,6 +125,8 @@ async def start_onboarding(
         from datetime import datetime, timedelta
         expires_at = session.expires_at or (datetime.utcnow() + timedelta(minutes=30)).isoformat() + "Z"
         
+        KNOT_EXTERNAL_IDS[current_user.id] = external_user_id
+
         return OnboardingStartResponse(
             session_token=session.session_token or session.session_id,  # Use session_id if token not provided
             session_id=session.session_id,
@@ -131,26 +163,12 @@ async def complete_onboarding(
     if not settings.FEATURE_KNOT:
         logger.info(f"Mock onboarding complete for user {current_user.id}")
         # Store some mock accounts for this user
-        KNOT_LINKED_ACCOUNTS[current_user.id] = [
-            {
-                "id": f"mock_account_{current_user.id}_1",
-                "user_id": current_user.id,
-                "institution": "Amazon",
-                "account_name": "Amazon Account",
-                "account_type": "transaction_link",
-                "balance": 0.0,
-                "currency": "USD",
-                "permissions": {"transactions": True, "cards": True},
-                "status": "active",
-                "last_synced": datetime.utcnow().isoformat(),
-                "knot_account_id": None,
-                "knot_merchant_id": "amazon",
-            }
-        ]
+        mock_accounts = _build_mock_accounts(current_user)
+        KNOT_LINKED_ACCOUNTS[current_user.id] = mock_accounts
         return OnboardingCompleteResponse(
             success=True,
-            accounts_linked=1,
-            message="Mock onboarding completed - 1 account linked",
+            accounts_linked=len(mock_accounts),
+            message=f"Mock onboarding completed - {len(mock_accounts)} account(s) linked",
         )
     
     # Real Knot integration
@@ -162,8 +180,11 @@ async def complete_onboarding(
         await asyncio.sleep(2)
         
         # Fetch accounts from Knot
-        logger.info(f"Fetching accounts for user {current_user.id} from Knot API...")
-        accounts = await knot.get_accounts(str(current_user.id))
+        external_user_id = KNOT_EXTERNAL_IDS.get(current_user.id, str(current_user.id))
+        logger.info(
+            f"Fetching accounts for user {current_user.id} (external_id={external_user_id}) from Knot API..."
+        )
+        accounts = await knot.get_accounts(external_user_id)
         logger.info(f"✅ Knot returned {len(accounts)} accounts")
         
         if len(accounts) == 0:
@@ -207,6 +228,16 @@ async def complete_onboarding(
         logger.error(f"   Message: {e.message}")
         logger.error(f"   Response: {e.response}")
         
+        # In sandbox/debug environments, fall back to mock accounts
+        if settings.DEBUG or not settings.FEATURE_KNOT:
+            mock_accounts = _build_mock_accounts(current_user)
+            KNOT_LINKED_ACCOUNTS[current_user.id] = mock_accounts
+            return OnboardingCompleteResponse(
+                success=True,
+                accounts_linked=len(mock_accounts),
+                message="Knot unavailable - linked mock accounts instead",
+            )
+
         # Return error details to frontend
         KNOT_LINKED_ACCOUNTS[current_user.id] = []
         return OnboardingCompleteResponse(
@@ -218,6 +249,15 @@ async def complete_onboarding(
         logger.error(f"❌ Unexpected error during onboarding complete: {e}")
         logger.exception(e)
         
+        if settings.DEBUG or not settings.FEATURE_KNOT:
+            mock_accounts = _build_mock_accounts(current_user)
+            KNOT_LINKED_ACCOUNTS[current_user.id] = mock_accounts
+            return OnboardingCompleteResponse(
+                success=True,
+                accounts_linked=len(mock_accounts),
+                message="Onboarding completed with mock accounts due to an unexpected error",
+            )
+
         KNOT_LINKED_ACCOUNTS[current_user.id] = []
         return OnboardingCompleteResponse(
             success=False,

@@ -159,6 +159,18 @@ export default function OnboardingPage() {
         useSearch: true,
 
         onSuccess: async (product, details) => {
+          console.log("Hi there!");
+        },
+
+        onError: (product, errorCode, errorDescription) => {
+          console.error("❌ Knot SDK error:", errorCode, errorDescription);
+          setError(`${errorCode}: ${errorDescription}`);
+          setCurrentStep(0); 
+          setLoading(false);
+        },
+
+        onEvent: async (product, details) => {
+
           console.log("🎯🎯🎯 onSuccess callback FIRED! 🎯🎯🎯");
           console.log("🎯 Product:", product);
           console.log("🎯 Details:", JSON.stringify(details, null, 2));
@@ -310,18 +322,6 @@ export default function OnboardingPage() {
             setCurrentStep(0);
             setLoading(false);
           }
-        },
-
-        onError: (product, errorCode, errorDescription) => {
-          console.error("❌ Knot SDK error:", errorCode, errorDescription);
-          setError(`${errorCode}: ${errorDescription}`);
-          setCurrentStep(0); 
-          setLoading(false);
-        },
-
-        onEvent: (product, event, merchant, merchantId, payload, taskId) => {
-          console.log("HELLOOOOOOOOOOOO", product, event, merchant, merchantId, payload, taskId);
-          console.log("📊 Knot event:", event, merchant, merchantId);
         },
 
         onExit: (product) => {
